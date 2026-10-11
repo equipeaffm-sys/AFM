@@ -21,11 +21,18 @@ export default function NewProductPage() {
         description: formData.description,
         price_cents: Math.round(formData.priceEuros * 100),
         cost_price_cents: Math.round(formData.costPriceEuros * 100),
+        sale_price_cents:
+          formData.salePriceEuros === null ? null : Math.round(formData.salePriceEuros * 100),
+        sale_ends_at: formData.salePriceEuros === null || !formData.saleEndsAt
+          ? null
+          : `${formData.saleEndsAt}T23:59:59.999Z`,
         stock: formData.stock,
+        low_stock_threshold: formData.lowStockThreshold,
         category: formData.categoryName,
         category_id: formData.categoryId || null,
         images: formData.images,
         is_active: formData.is_active,
+        is_featured: formData.is_featured,
       }
 
       const { error } = await supabase.from('products').insert(newProduct)
@@ -65,7 +72,7 @@ export default function NewProductPage() {
             Ajouter une Nouvelle Création
           </h1>
           <p className="text-zinc-600 text-xs font-light">
-            Renseignez les caractéristiques et téléversez les visuels HD dans le bucket Supabase.
+            Complétez la fiche, ajoutez vos visuels, définissez les prix et le stock, puis choisissez de publier maintenant ou d’enregistrer en brouillon.
           </p>
         </div>
 

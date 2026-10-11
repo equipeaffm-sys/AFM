@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Upload, X, ArrowUp, ArrowDown, Image as ImageIcon, Sparkles, Check, Plus, Crop } from 'lucide-react'
+import { Upload, X, ArrowUp, ArrowDown, Image as ImageIcon, Sparkles, Check, Plus, Crop, FolderTree, Star } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export interface ProductFormData {
@@ -13,24 +14,21 @@ export interface ProductFormData {
   description: string
   priceEuros: number
   costPriceEuros: number
+  salePriceEuros: number | null
+  saleEndsAt: string
   stock: number
+  lowStockThreshold: number
   categoryName: string
   categoryId?: string
   images: string[]
   is_active: boolean
+  is_featured: boolean
 }
 
 interface CategoryOption {
   id: string
   name: string
 }
-
-const DEFAULT_CATEGORIES: CategoryOption[] = [
-  { id: 'c1000000-0000-4000-8000-000000000101', name: 'Maison & Art de vivre' },
-  { id: 'c1000000-0000-4000-8000-000000000052', name: 'Maroquinerie & Voyage' },
-  { id: 'c1000000-0000-4000-8000-000000000102', name: "Accessoires d'Exception" },
-  { id: 'c1000000-0000-4000-8000-000000000103', name: 'Éditions Limitées' },
-]
 
 interface ProductFormProps {
   initialData?: ProductFormData
@@ -42,20 +40,27 @@ export default function ProductForm({ initialData, onSubmit, buttonText }: Produ
   const [title, setTitle] = useState(initialData?.title || '')
   const [slug, setSlug] = useState(initialData?.slug || '')
   const [description, setDescription] = useState(initialData?.description || '')
-  const [priceEuros, setPriceEuros] = useState<number>(initialData?.priceEuros ?? 100)
-  const [costPriceEuros, setCostPriceEuros] = useState<number>(initialData?.costPriceEuros ?? 40)
-  const [stock, setStock] = useState<number>(initialData?.stock ?? 10)
-  const [categoryName, setCategoryName] = useState(initialData?.categoryName || 'Maroquinerie & Voyage')
-  const [categoryId, setCategoryId] = useState(initialData?.categoryId || '')
-  const [images, setImages] = useState<string[]>(
-    initialData?.images || ['https://images.unsplash.com/photo-1523275335684-37898b6baf30']
+  const [priceEuros, setPriceEuros] = useState<number>(initialData?.priceEuros ?? 0)
+  const [costPriceEuros, setCostPriceEuros] = useState<number>(initialData?.costPriceEuros ?? 0)
+  const [salePriceEuros, setSalePriceEuros] = useState<number | null>(initialData?.salePriceEuros ?? null)
+  const [saleEndsAt, setSaleEndsAt] = useState(initialData?.saleEndsAt || '')
+  const [stock, setStock] = useState<number>(initialData?.stock ?? 0)
+  const [lowStockThreshold, setLowStockThreshold] = useState<number>(initialData?.lowStockThreshold ?? 3)
+  const [categoryName, setCategoryName] = useState(initialData?.categoryName || '')
+  const [categoryId, setCategoryId] = useState(
+    initialData?.categoryId || (initialData?.categoryName ? '__current__' : '')
   )
+  const [images, setImages] = useState<string[]>(initialData?.images || [])
   const [isActive, setIsActive] = useState<boolean>(initialData?.is_active ?? true)
+  const [isFeatured, setIsFeatured] = useState<boolean>(initialData?.is_featured ?? false)
 
-  const [categories, setCategories] = useState<CategoryOption[]>(DEFAULT_CATEGORIES)
+  const [categories, setCategories] = useState<CategoryOption[]>([])
+  const [categoriesLoading, setCategoriesLoading] = useState(true)
+  const [categoriesError, setCategoriesError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [customImageUrl, setCustomImageUrl] = useState('')
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false)
 
   // Auto-generate slug from title
   useEffect(() => {
@@ -75,12 +80,18 @@ export default function ProductForm({ initialData, onSubmit, buttonText }: Produ
     async function loadCategories() {
       try {
         const supabase = createClient()
-        const { data } = await supabase.from('categories').select('id, name').order('name')
-        if (data && data.length > 0) {
-          setCategories(data)
-        }
-      } catch {
-        setCategories(DEFAULT_CATEGORIES)
+        const { data, error } = await supabase
+          .from('categories')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name')
+        if (error) throw error
+        setCategories(data || [])
+      } catch (error) {
+        console.error('Unable to load product categories:', error)
+        setCategoriesError('Impossible de charger les catégories.')
+      } finally {
+        setCategoriesLoading(false)
       }
     }
     loadCategories()
@@ -90,8 +101,10 @@ export default function ProductForm({ initialData, onSubmit, buttonText }: Produ
   const compressAndResizeImage = (file: File): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const img = new window.Image()
-      img.src = URL.createObjectURL(file)
+      const objectUrl = URL.createObjectURL(file)
+      img.src = objectUrl
       img.onload = () => {
+        URL.revokeObjectURL(objectUrl)
         const canvas = document.createElement('canvas')
         const MAX_WIDTH = 1200
         const MAX_HEIGHT = 1200
@@ -123,28 +136,50 @@ export default function ProductForm({ initialData, onSubmit, buttonText }: Produ
               else reject(new Error('Erreur de compression de l\'image.'))
             },
             'image/webp',
-            0.88 // 80% WebP compression quality for high definition
+            0.88
           )
         } else {
           reject(new Error('Canvas context error'))
         }
       }
-      img.onerror = (err) => reject(err)
+      img.onerror = (err) => {
+        URL.revokeObjectURL(objectUrl)
+        reject(err)
+      }
     })
   }
 
   // Handle Drag & Drop File Upload to Supabase Storage bucket 'product-images'
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return
+    const selectedFiles = Array.from(files)
+    const invalidFile = selectedFiles.find(
+      (file) => !file.type.startsWith('image/') || file.size > 10 * 1024 * 1024
+    )
+    if (invalidFile) {
+      toast.error(
+        invalidFile.size > 10 * 1024 * 1024
+          ? `${invalidFile.name} dépasse la limite de 10 Mo.`
+          : `${invalidFile.name} n’est pas un fichier image.`
+      )
+      return
+    }
     setUploading(true)
 
     try {
       const supabase = createClient()
       const uploadedUrls: string[] = []
+      const failures: string[] = []
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-        const compressedBlob = await compressAndResizeImage(file)
+      for (const file of selectedFiles) {
+        let compressedBlob: Blob
+        try {
+          compressedBlob = await compressAndResizeImage(file)
+        } catch (error) {
+          console.error(`Unable to process product image ${file.name}:`, error)
+          failures.push(file.name)
+          continue
+        }
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.webp`
         const filePath = `products/${fileName}`
 
@@ -154,23 +189,24 @@ export default function ProductForm({ initialData, onSubmit, buttonText }: Produ
             contentType: 'image/webp',
           })
 
-        if (!uploadError) {
-          const { data } = supabase.storage.from('product-images').getPublicUrl(filePath)
-          if (data?.publicUrl) {
-            uploadedUrls.push(data.publicUrl)
-          }
-        } else {
-          uploadedUrls.push('https://images.unsplash.com/photo-1584917865442-de89df76afd3')
+        if (uploadError) {
+          console.error(`Unable to upload product image ${file.name}:`, uploadError)
+          failures.push(file.name)
+          continue
         }
+        const { data } = supabase.storage.from('product-images').getPublicUrl(filePath)
+        if (data?.publicUrl) uploadedUrls.push(data.publicUrl)
       }
 
       if (uploadedUrls.length > 0) {
         setImages((prev) => [...prev, ...uploadedUrls])
-        toast.success(`${uploadedUrls.length} image(s) WebP compressée(s) et ajoutée(s) !`)
+      }
+      if (uploadedUrls.length > 0) toast.success(`${uploadedUrls.length} image(s) ajoutée(s).`)
+      if (failures.length > 0) {
+        toast.error(`${failures.length} image(s) n’ont pas pu être téléversées.`)
       }
     } catch {
-      toast.success('Image WebP ajoutée à la galerie !')
-      setImages((prev) => [...prev, 'https://images.unsplash.com/photo-1584917865442-de89df76afd3'])
+      toast.error('Échec du téléversement. Vérifiez la configuration Supabase Storage.')
     } finally {
       setUploading(false)
     }
@@ -178,10 +214,16 @@ export default function ProductForm({ initialData, onSubmit, buttonText }: Produ
 
   // Add image by direct URL
   const handleAddCustomUrl = () => {
-    if (!customImageUrl) return
-    setImages((prev) => [...prev, customImageUrl])
+    try {
+      const url = new URL(customImageUrl)
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Invalid protocol')
+      setImages((prev) => [...prev, url.toString()])
+    } catch {
+      toast.error('Saisissez une URL d’image valide (http ou https).')
+      return
+    }
     setCustomImageUrl('')
-    toast.success('URL image ajoutée !')
+    toast.success('URL ajoutée à la galerie.')
   }
 
   // Delete Image
@@ -202,8 +244,35 @@ export default function ProductForm({ initialData, onSubmit, buttonText }: Produ
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title || !priceEuros) {
-      toast.error('Veuillez renseigner au moins le titre et le prix.')
+    if (!title.trim()) {
+      toast.error('Le nom du produit est obligatoire.')
+      return
+    }
+    if (!Number.isFinite(priceEuros) || priceEuros < 0) {
+      toast.error('Saisissez un prix de vente valide.')
+      return
+    }
+    if (
+      salePriceEuros !== null &&
+      (!Number.isFinite(salePriceEuros) || salePriceEuros < 0 || salePriceEuros >= priceEuros)
+    ) {
+      toast.error('Le prix promotionnel doit être inférieur au prix normal.')
+      return
+    }
+    if (salePriceEuros === null && saleEndsAt) setSaleEndsAt('')
+    if (
+      !Number.isInteger(stock) ||
+      stock < 0 ||
+      !Number.isInteger(lowStockThreshold) ||
+      lowStockThreshold < 0 ||
+      !Number.isFinite(costPriceEuros) ||
+      costPriceEuros < 0
+    ) {
+      toast.error('Le stock et le seuil d’alerte doivent être des nombres entiers positifs.')
+      return
+    }
+    if (!categoryName.trim()) {
+      toast.error('Choisissez ou créez une catégorie avant d’enregistrer.')
       return
     }
 
@@ -216,11 +285,15 @@ export default function ProductForm({ initialData, onSubmit, buttonText }: Produ
         description,
         priceEuros,
         costPriceEuros,
+        salePriceEuros,
+        saleEndsAt,
         stock,
+        lowStockThreshold,
         categoryName,
         categoryId: categoryId || undefined,
         images,
         is_active: isActive,
+        is_featured: isFeatured,
       })
     } finally {
       setSubmitting(false)
@@ -278,19 +351,50 @@ export default function ProductForm({ initialData, onSubmit, buttonText }: Produ
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div>
             <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 block mb-1">
-              Prix Vente HT (€) *
+              Prix de vente (€) *
             </label>
             <input
               type="number"
+              min="0"
               step="0.01"
               required
               value={priceEuros}
-              onChange={(e) => setPriceEuros(parseFloat(e.target.value || '0'))}
+              onChange={(e) => setPriceEuros(e.target.value === '' ? Number.NaN : Number(e.target.value))}
               className="w-full px-4 py-2.5 bg-[#FAF8F5] border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-950 focus:outline-none focus:border-[#C5A059]"
             />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 block mb-1">
+              Prix promotionnel (€)
+            </label>
+            <input
+              type="number"
+              min="0"
+              max={priceEuros}
+              step="0.01"
+              value={salePriceEuros ?? ''}
+              onChange={(e) => setSalePriceEuros(e.target.value === '' ? null : Number(e.target.value))}
+              className="w-full px-4 py-2.5 bg-[#FAF8F5] border border-zinc-200 rounded-xl text-xs font-mono text-zinc-900 focus:outline-none focus:border-[#C5A059]"
+            />
+            <p className="mt-1 text-[10px] text-zinc-500">Laisser vide s’il n’y a pas de promotion.</p>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 block mb-1">
+              Fin de promotion
+            </label>
+            <input
+              type="date"
+              value={saleEndsAt}
+              disabled={salePriceEuros === null}
+              onChange={(e) => setSaleEndsAt(e.target.value)}
+              className="w-full px-4 py-2.5 bg-[#FAF8F5] border border-zinc-200 rounded-xl text-xs text-zinc-900 focus:outline-none focus:border-[#C5A059] disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <p className="mt-1 text-[10px] text-zinc-500">Optionnel ; la promotion reste active sans date.</p>
           </div>
 
           <div>
@@ -299,72 +403,144 @@ export default function ProductForm({ initialData, onSubmit, buttonText }: Produ
             </label>
             <input
               type="number"
+              min="0"
               step="0.01"
               value={costPriceEuros}
-              onChange={(e) => setCostPriceEuros(parseFloat(e.target.value || '0'))}
+              onChange={(e) => setCostPriceEuros(e.target.value === '' ? 0 : Number(e.target.value))}
               className="w-full px-4 py-2.5 bg-[#FAF8F5] border border-zinc-200 rounded-xl text-xs font-mono text-zinc-900 focus:outline-none focus:border-[#C5A059]"
             />
           </div>
 
           <div>
             <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 block mb-1">
-              Stock Initial *
+              Stock actuel *
             </label>
             <input
               type="number"
+              min="0"
+              step="1"
               required
               value={stock}
-              onChange={(e) => setStock(parseInt(e.target.value || '0', 10))}
+              onChange={(e) => setStock(e.target.value === '' ? Number.NaN : Number(e.target.value))}
               className="w-full px-4 py-2.5 bg-[#FAF8F5] border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-950 focus:outline-none focus:border-[#C5A059]"
             />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 block mb-1">
+              Alerte stock bas
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={lowStockThreshold}
+              onChange={(e) => setLowStockThreshold(e.target.value === '' ? Number.NaN : Number(e.target.value))}
+              className="w-full px-4 py-2.5 bg-[#FAF8F5] border border-zinc-200 rounded-xl text-xs font-mono text-zinc-900 focus:outline-none focus:border-[#C5A059]"
+            />
+            <p className="mt-1 text-[10px] text-zinc-500">Seuil utilisé dans les alertes de stock.</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
           <div>
             <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 block mb-1">
-              Rayon / Catégorie
+              Catégorie *
             </label>
-            <select
-              value={categoryName}
-              onChange={(e) => {
-                setCategoryName(e.target.value)
-                const matched = categories.find((c) => c.name === e.target.value)
-                if (matched) setCategoryId(matched.id)
-              }}
-              className="w-full px-4 py-2.5 bg-[#FAF8F5] border border-zinc-200 rounded-xl text-xs text-zinc-900 focus:outline-none focus:border-[#C5A059] cursor-pointer"
-            >
-              {categories.map((c) => (
-                <option key={c.id} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            {categoriesLoading ? (
+              <div role="status" className="rounded-xl border border-zinc-200 bg-[#FAF8F5] px-4 py-3 text-xs text-zinc-500">
+                Chargement des catégories…
+              </div>
+            ) : categories.length > 0 ? (
+              <select
+                required
+                value={categoryId}
+                onChange={(e) => {
+                  if (e.target.value === '__current__') {
+                    setCategoryId('')
+                    setCategoryName(initialData?.categoryName || '')
+                    return
+                  }
+                  const selected = categories.find((item) => item.id === e.target.value)
+                  setCategoryId(selected?.id || '')
+                  setCategoryName(selected?.name || '')
+                }}
+                className="w-full px-4 py-2.5 bg-[#FAF8F5] border border-zinc-200 rounded-xl text-xs text-zinc-900 focus:outline-none focus:border-[#C5A059] cursor-pointer"
+              >
+                <option value="">Choisir une catégorie…</option>
+                {initialData?.categoryName &&
+                  (!initialData.categoryId || !categories.some((item) => item.id === initialData.categoryId)) && (
+                    <option value={initialData.categoryId || '__current__'}>
+                      {initialData.categoryName} (actuelle)
+                    </option>
+                  )}
+                {categories.map((item) => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
+              </select>
+            ) : (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-950">
+                <p>{categoriesError || 'Aucune catégorie active. Créez une catégorie avant d’ajouter un produit.'}</p>
+                {initialData?.categoryName && (
+                  <p className="mt-1">La catégorie actuelle « {initialData.categoryName} » sera conservée.</p>
+                )}
+              </div>
+            )}
+            <div className="mt-2 flex items-center justify-between gap-2">
+              {categoriesError && <span role="status" className="text-[10px] text-amber-700">{categoriesError}</span>}
+              <Link
+                href="/admin/categories"
+                className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#806238] hover:underline"
+              >
+                <FolderTree className="h-3 w-3" aria-hidden="true" />
+                Gérer les catégories
+              </Link>
+            </div>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-[#FAF8F5] border border-zinc-200 rounded-xl">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-900 block">
-                Statut Boutique Publique
-              </span>
-              <span className="text-[10px] text-zinc-500 font-light">
-                {isActive ? 'Produit visible immédiatement' : 'Produit masqué sur le site'}
-              </span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3 p-4 bg-[#FAF8F5] border border-zinc-200 rounded-xl">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-zinc-900 block">
+                  Publication
+                </span>
+                <span className="text-[10px] text-zinc-500 font-light">
+                  {isActive ? 'Visible dans le catalogue public' : 'Enregistré comme brouillon masqué'}
+                </span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isActive}
+                aria-label="Publier le produit"
+                onClick={() => setIsActive(!isActive)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#C5A059] ${
+                  isActive ? 'bg-emerald-600' : 'bg-zinc-300'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition duration-200 ease-in-out ${
+                    isActive ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsActive(!isActive)}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                isActive ? 'bg-emerald-600' : 'bg-zinc-300'
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                  isActive ? 'translate-x-5' : 'translate-x-0'
-                }`}
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-[#FAF8F5] p-4">
+              <span>
+                <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-900">
+                  <Star className="h-3.5 w-3.5 text-[#C5A059]" aria-hidden="true" />
+                  Produit à la une
+                </span>
+                <span className="mt-1 block text-[10px] text-zinc-500">Mise en avant sur la boutique si l’accueil le permet.</span>
+              </span>
+              <input
+                type="checkbox"
+                checked={isFeatured}
+                onChange={(e) => setIsFeatured(e.target.checked)}
+                className="h-4 w-4 accent-[#806238]"
               />
-            </button>
+            </label>
           </div>
         </div>
       </div>
@@ -383,14 +559,32 @@ export default function ProductForm({ initialData, onSubmit, buttonText }: Produ
         </h2>
 
         {/* Drag & Drop Upload Zone */}
-        <div className="border-2 border-dashed border-zinc-300 rounded-2xl p-8 text-center bg-[#FAF8F5] space-y-3 hover:border-[#C5A059] transition-colors">
+        <div
+          onDragOver={(event) => {
+            event.preventDefault()
+            setIsDraggingFiles(true)
+          }}
+          onDragLeave={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              setIsDraggingFiles(false)
+            }
+          }}
+          onDrop={(event) => {
+            event.preventDefault()
+            setIsDraggingFiles(false)
+            void handleFileUpload(event.dataTransfer.files)
+          }}
+          className={`border-2 border-dashed rounded-2xl p-8 text-center bg-[#FAF8F5] space-y-3 transition-colors ${
+            isDraggingFiles ? 'border-[#C5A059] bg-amber-50' : 'border-zinc-300 hover:border-[#C5A059]'
+          }`}
+        >
           <Upload className="w-10 h-10 mx-auto text-[#C5A059]" />
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-zinc-900">
-              Glissez-Déposez vos images ici (Conversion WebP HD en direct)
+              Déposez vos images ici ou sélectionnez des fichiers
             </p>
             <p className="text-[11px] text-zinc-500 font-light mt-0.5">
-              Toutes les images sont automatiquement converties en .webp optimisé avant téléversement.
+              Images converties en WebP, jusqu’à 1200 px. Maximum 10 Mo par image.
             </p>
           </div>
 
@@ -486,11 +680,15 @@ export default function ProductForm({ initialData, onSubmit, buttonText }: Produ
       <div className="flex justify-end pt-4">
         <button
           type="submit"
-          disabled={submitting || uploading}
+          disabled={submitting || uploading || categoriesLoading || (!initialData && categories.length === 0)}
           className="px-8 py-4 bg-[#0D0D0D] text-[#C5A059] hover:bg-[#C5A059] hover:text-[#0D0D0D] text-xs font-bold uppercase tracking-widest rounded-xl transition-all shadow-xl flex items-center gap-2 disabled:opacity-50"
         >
           <Check className="w-4 h-4" />
-          {submitting ? 'Enregistrement...' : buttonText}
+          {uploading
+            ? 'Téléversement des images...'
+            : submitting
+              ? 'Enregistrement...'
+              : buttonText}
         </button>
       </div>
     </form>

@@ -1,19 +1,26 @@
 'use client'
 
+'use client'
+
 import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   ArrowLeft,
   BarChart3,
+  ClipboardList,
+  FileText,
   FolderTree,
   LayoutDashboard,
+  MessageSquare,
   Package,
   Palette,
+  Percent,
   Settings,
   ShoppingBag,
   Truck,
 } from 'lucide-react'
+import AdminSessionGuard from '@/components/AdminSessionGuard'
 
 const navItems = [
   { label: 'Vue d’ensemble', href: '/admin', icon: LayoutDashboard },
@@ -22,6 +29,10 @@ const navItems = [
   { label: 'Commandes', href: '/admin/orders', icon: ShoppingBag },
   { label: 'Stock', href: '/admin/inventory', icon: BarChart3 },
   { label: 'Livraison', href: '/admin/shipping', icon: Truck },
+  { label: 'Promotions', href: '/admin/promotions', icon: Percent },
+  { label: 'Avis clients', href: '/admin/reviews', icon: MessageSquare },
+  { label: 'Factures', href: '/admin/invoices', icon: FileText },
+  { label: 'Journal d’audit', href: '/admin/audit-logs', icon: ClipboardList },
   { label: 'Apparence', href: '/admin/appearance', icon: Palette },
   { label: 'Paramètres', href: '/admin/settings', icon: Settings },
 ]
@@ -30,6 +41,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname()
 
   return (
+    <AdminSessionGuard timeoutMinutes={15}>
     <div className="min-h-screen bg-[#f5f3ee] font-sans text-zinc-900 md:flex">
       <aside className="border-b border-[#e4ded3] bg-[#fbfaf7] md:sticky md:top-0 md:h-screen md:w-64 md:shrink-0 md:overflow-y-auto md:border-b-0 md:border-r">
         <div className="flex items-center justify-between gap-4 px-5 py-4 md:block md:px-5 md:py-6">
@@ -83,5 +95,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="mx-auto w-full max-w-[1500px]">{children}</div>
       </main>
     </div>
+    </AdminSessionGuard>
   )
 }

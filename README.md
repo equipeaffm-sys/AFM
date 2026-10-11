@@ -25,6 +25,15 @@ commandes est temporairement désactivée tant que les conditions réelles de li
 pas définies. Avant de l’activer, renseignez également les vraies clés Stripe et Resend dans
 `.env.local` et implémentez les conditions de commande applicables.
 
+## Administration
+
+L’administration n’est pas exposée dans la navigation publique. Son accès est contrôlé par
+Supabase Auth, les rôles en base et les politiques RLS ; son URL n’est pas considérée comme un
+secret. Pour créer votre propre compte administrateur sans identifiants codés en dur, suivez
+[`supabase/ADMIN_SETUP.md`](./supabase/ADMIN_SETUP.md). Pour une base déjà installée, exécutez
+[`supabase/admin-security-hardening.sql`](./supabase/admin-security-hardening.sql) dans le SQL
+Editor Supabase. N’ajoutez jamais de mot de passe ou de clé privée au code ou au dépôt.
+
 ## Conseiller de la boutique
 
 Le widget fournit des réponses locales aux questions fréquentes (catalogue, compte,

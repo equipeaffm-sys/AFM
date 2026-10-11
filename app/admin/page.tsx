@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import Image from 'next/image'
-import AdminSessionGuard from '@/components/AdminSessionGuard'
 import {
   Package,
   ShoppingBag,
@@ -359,7 +358,6 @@ export default function AdminPage() {
   const userRole = userProfile?.role || 'customer'
 
   return (
-    <AdminSessionGuard timeoutMinutes={15}>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-zinc-900 space-y-8 bg-[#FAFAFA]">
       {/* Admin Header & RBAC Badge */}
       <div className="bg-white border border-zinc-200 rounded-2xl p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -893,6 +891,5 @@ export default function AdminPage() {
         </div>
       )}
     </div>
-    </AdminSessionGuard>
   )
 }

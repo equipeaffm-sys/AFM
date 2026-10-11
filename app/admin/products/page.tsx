@@ -24,6 +24,7 @@ import toast from 'react-hot-toast'
 import { Product } from '@/lib/constants'
 
 type StatusFilterType = 'all' | 'active' | 'inactive' | 'out_of_stock'
+type CategoryOption = { id: string; name: string }
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -39,7 +40,10 @@ export default function AdminProductsPage() {
   const [fastAddOpen, setIsFastAddOpen] = useState(false)
   const [fastTitle, setFastTitle] = useState('')
   const [fastPriceEuros, setFastPriceEuros] = useState<number>(0)
-  const [fastCategory, setFastCategory] = useState('')
+  const [fastCategoryId, setFastCategoryId] = useState('')
+  const [categories, setCategories] = useState<CategoryOption[]>([])
+  const [categoriesLoading, setCategoriesLoading] = useState(true)
+  const [categoriesError, setCategoriesError] = useState<string | null>(null)
   const [fastImageFile, setFastImageFile] = useState<File | null>(null)
   const [fastAdding, setFastAdding] = useState(false)
 
@@ -54,16 +58,38 @@ export default function AdminProductsPage() {
       const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false })
       if (error) throw error
       setProducts(data || [])
-    } catch {
+    } catch (error) {
+      console.error('Unable to load admin products:', error)
       setProducts([])
-      toast.error('Impossible de charger les produits.')
+      toast.error(error instanceof Error ? error.message : 'Impossible de charger les produits.')
     } finally {
       setLoading(false)
     }
   }
 
+  const loadCategories = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('categories')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name')
+      if (error) throw error
+      setCategories(data || [])
+      setCategoriesError(null)
+    } catch (error) {
+      console.error('Unable to load categories for quick add:', error)
+      setCategories([])
+      setCategoriesError(error instanceof Error ? error.message : 'Impossible de charger les catégories.')
+    } finally {
+      setCategoriesLoading(false)
+    }
+  }
+
   useEffect(() => {
     loadProducts()
+    loadCategories()
   }, [])
 
   // Inline Stock Adjustment (+ / -)
@@ -146,7 +172,8 @@ export default function AdminProductsPage() {
       )
 
       toast.success('Image principale remplacée en 1-clic !', { id: 'img-replace' })
-    } catch {
+    } catch (error) {
+      console.error('Unable to replace product image:', error)
       toast.error('Impossible de remplacer l’image.', { id: 'img-replace' })
     } finally {
       setReplacingProductId(null)
@@ -157,8 +184,13 @@ export default function AdminProductsPage() {
   // Express Fast-Add Creation Handler
   const handleFastAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!fastTitle || !fastPriceEuros) {
-      toast.error('Veuillez spécifier au moins un titre et un prix.')
+    const selectedCategory = categories.find((category) => category.id === fastCategoryId)
+    if (!fastTitle.trim() || !selectedCategory || !Number.isFinite(fastPriceEuros) || fastPriceEuros < 0) {
+      toast.error('Renseignez un titre, une catégorie active et un prix valide (zéro est autorisé).')
+      return
+    }
+    if (fastImageFile && (!fastImageFile.type.startsWith('image/') || fastImageFile.size > 10 * 1024 * 1024)) {
+      toast.error('Choisissez une image de 10 Mo maximum.')
       return
     }
 
@@ -182,31 +214,41 @@ export default function AdminProductsPage() {
         imageUrl = data.publicUrl
       }
 
-      const slug = fastTitle.toLowerCase().replace(/\s+/g, '-')
+      const slug = fastTitle.trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '')
       const newProductRecord = {
-        title: fastTitle,
+        title: fastTitle.trim(),
         slug,
         description: '',
         price_cents: Math.round(fastPriceEuros * 100),
-        cost_price_cents: 0,
+        cost_price_cents: null,
         stock: 0,
-        category: fastCategory,
+        low_stock_threshold: 3,
+        category: selectedCategory.name,
+        category_id: selectedCategory.id,
         images: imageUrl ? [imageUrl] : [],
-        is_active: true,
+        is_active: false,
+        is_featured: false,
       }
 
       const { data, error } = await supabase.from('products').insert(newProductRecord).select().single()
 
       if (error || !data) throw error || new Error('Product not created')
       setProducts((prev) => [data, ...prev])
-      toast.success(`"${fastTitle}" ajouté au catalogue.`)
+      toast.success(`"${fastTitle.trim()}" enregistré comme brouillon. Complétez sa fiche avant publication.`)
 
       setFastTitle('')
       setFastPriceEuros(0)
+      setFastCategoryId('')
       setFastImageFile(null)
       setIsFastAddOpen(false)
-    } catch {
-      toast.error('Impossible de créer le produit.')
+    } catch (error) {
+      console.error('Unable to create product from quick add:', error)
+      toast.error(error instanceof Error ? error.message : 'Impossible de créer le produit.')
     } finally {
       setFastAdding(false)
     }
@@ -224,13 +266,11 @@ export default function AdminProductsPage() {
         })
         .eq('id', product.id)
 
-      if (error) {
-        toast.error('Impossible d’enregistrer les modifications.')
-      } else {
-        toast.success(`Modifications enregistrées pour "${product.title}".`)
-      }
-    } catch {
-      toast.error('Impossible d’enregistrer les modifications.')
+      if (error) throw error
+      toast.success(`Modifications enregistrées pour "${product.title}".`)
+    } catch (error) {
+      console.error(`Unable to save product row ${product.id}:`, error)
+      toast.error(error instanceof Error ? error.message : 'Impossible d’enregistrer les modifications.')
     }
   }
 
@@ -243,16 +283,39 @@ export default function AdminProductsPage() {
       const supabase = createClient()
       const { error } = await supabase.from('products').delete().eq('id', productToDelete.id)
 
-      if (error) {
-        toast.error('Impossible de supprimer le produit.')
-        return
+      if (error) throw error
+
+      const storagePrefix = '/storage/v1/object/public/product-images/'
+      const storagePaths = (productToDelete.images || [])
+        .map((imageUrl) => {
+          try {
+            const path = new URL(imageUrl).pathname
+            const prefixIndex = path.indexOf(storagePrefix)
+            return prefixIndex === -1
+              ? null
+              : decodeURIComponent(path.slice(prefixIndex + storagePrefix.length))
+          } catch {
+            return null
+          }
+        })
+        .filter((path): path is string => Boolean(path))
+      let storageCleanupFailed = false
+      if (storagePaths.length > 0) {
+        const { error: storageError } = await supabase.storage.from('product-images').remove(storagePaths)
+        storageCleanupFailed = Boolean(storageError)
+        if (storageError) console.error('Unable to remove deleted product images:', storageError)
       }
 
-      toast.success(`Produit "${productToDelete.title}" supprimé.`)
+      toast.success(
+        storageCleanupFailed
+          ? 'Produit supprimé, mais certaines images n’ont pas pu être supprimées du stockage.'
+          : `Produit "${productToDelete.title}" supprimé.`
+      )
       setProducts((prev) => prev.filter((p) => p.id !== productToDelete.id))
       setProductToDelete(null)
-    } catch {
-      toast.error('Impossible de supprimer le produit.')
+    } catch (error) {
+      console.error('Unable to delete product:', error)
+      toast.error(error instanceof Error ? error.message : 'Impossible de supprimer le produit.')
     } finally {
       setDeleting(false)
     }
@@ -311,7 +374,9 @@ export default function AdminProductsPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsFastAddOpen(true)}
-              className="px-5 py-3 bg-[#C5A059] text-[#0D0D0D] hover:bg-[#0D0D0D] hover:text-[#C5A059] text-xs font-bold uppercase tracking-wider rounded-xl transition-all flex items-center gap-2 shadow-md"
+              disabled={categoriesLoading || categories.length === 0}
+              title={categoriesError || (categories.length === 0 ? 'Créez d’abord une catégorie active.' : undefined)}
+              className="px-5 py-3 bg-[#C5A059] text-[#0D0D0D] hover:bg-[#0D0D0D] hover:text-[#C5A059] text-xs font-bold uppercase tracking-wider rounded-xl transition-all flex items-center gap-2 shadow-md disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Zap className="w-4 h-4" />
               Ajout Express (Fast-Add)
@@ -373,10 +438,12 @@ export default function AdminProductsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="font-bold uppercase tracking-wider text-zinc-700 block mb-1">
-                      2. Prix Vente HT (€) *
+                      2. Prix de vente (€) *
                     </label>
                     <input
                       type="number"
+                      min="0"
+                      step="0.01"
                       required
                       value={fastPriceEuros}
                       onChange={(e) => setFastPriceEuros(parseFloat(e.target.value || '0'))}
@@ -386,14 +453,20 @@ export default function AdminProductsPage() {
 
                   <div>
                     <label className="font-bold uppercase tracking-wider text-zinc-700 block mb-1">
-                      3. Rayon / Catégorie
+                      3. Rayon / Catégorie *
                     </label>
-                    <input
-                      type="text"
-                      value={fastCategory}
-                      onChange={(e) => setFastCategory(e.target.value)}
+                    <select
+                      required
+                      value={fastCategoryId}
+                      onChange={(e) => setFastCategoryId(e.target.value)}
                       className="w-full px-4 py-2.5 bg-[#FAF8F5] border border-zinc-200 rounded-xl font-medium focus:outline-none focus:border-[#C5A059]"
-                    />
+                    >
+                      <option value="">Choisir une catégorie…</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>{category.name}</option>
+                      ))}
+                    </select>
+                    {categoriesError && <p role="status" className="mt-1 text-[10px] text-amber-700">{categoriesError}</p>}
                   </div>
                 </div>
 

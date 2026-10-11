@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Clock, LogOut, Lock } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 interface AdminSessionGuardProps {
   children: React.ReactNode
@@ -16,6 +17,7 @@ export default function AdminSessionGuard({
   const router = useRouter()
   const [showWarningModal, setShowWarningModal] = useState(false)
   const [secondsRemaining, setSecondsRemaining] = useState(60)
+  const [logoutError, setLogoutError] = useState<string | null>(null)
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null)
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -47,13 +49,24 @@ export default function AdminSessionGuard({
 
   const handleKeepAlive = () => {
     setShowWarningModal(false)
+    setLogoutError(null)
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current)
     resetInactivityTimer()
   }
 
-  const handleAutoLogout = () => {
-    setShowWarningModal(false)
-    router.push('/login?logout_reason=inactivity')
+  const handleAutoLogout = async () => {
+    try {
+      const { error } = await createClient().auth.signOut()
+      if (error) throw error
+      setShowWarningModal(false)
+      router.replace('/login?redirect=%2Fadmin')
+      router.refresh()
+    } catch (error) {
+      console.error('Unable to end the inactive administrator session:', error)
+      setLogoutError('La déconnexion automatique a échoué. Réessayez ou choisissez de rester connecté.')
+      setSecondsRemaining(60)
+      setShowWarningModal(true)
+    }
   }
 
   useEffect(() => {
@@ -96,6 +109,11 @@ export default function AdminSessionGuard({
               <p className="text-xs text-zinc-600 font-light leading-relaxed">
                 Par mesure de sécurité haut de gamme, votre session administrateur sera clôturée automatiquement dans :
               </p>
+              {logoutError && (
+                <p role="alert" className="rounded-lg bg-red-50 p-3 text-xs text-red-700">
+                  {logoutError}
+                </p>
+              )}
               <div className="text-4xl font-mono font-bold text-[#C5A059] pt-2">
                 {secondsRemaining}s
               </div>

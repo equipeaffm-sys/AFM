@@ -8,6 +8,7 @@ export interface Product {
   cost_price_cents?: number | null
   stock: number
   low_stock_threshold?: number
+  is_featured?: boolean
   images: string[]
   category: string
   category_id?: string | null

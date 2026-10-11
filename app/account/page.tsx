@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { User } from '@supabase/supabase-js'
-import { User as UserIcon, ShoppingBag, Edit2, Package, Clock } from 'lucide-react'
+import { User as UserIcon, ShoppingBag, Edit2, Package, Clock, ShieldCheck, LockKeyhole } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface UserProfile {
@@ -31,41 +31,50 @@ export default function AccountPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [fullNameInput, setFullNameInput] = useState('')
   const [updateLoading, setUpdateLoading] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordLoading, setPasswordLoading] = useState(false)
 
   const router = useRouter()
 
   const loadAccountData = useCallback(async () => {
-    const supabase = createClient()
-    const {
-      data: { user: currentUser },
-    } = await supabase.auth.getUser()
+    try {
+      const supabase = createClient()
+      const {
+        data: { user: currentUser },
+        error: userError,
+      } = await supabase.auth.getUser()
+      if (userError) throw userError
 
-    if (currentUser) {
-      setUser(currentUser)
-
-      // Fetch user profile
-      const { data: userProfile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', currentUser.id)
-        .single()
-
-      if (userProfile) {
-        setProfile(userProfile)
-        setFullNameInput(userProfile.full_name || '')
+      if (!currentUser) {
+        router.replace('/login?redirect=%2Faccount')
+        return
       }
 
-      // Fetch user orders
-      const { data: userOrders } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('created_at', { ascending: false })
+      setUser(currentUser)
+      const [{ data: userProfile, error: profileError }, { data: userOrders, error: ordersError }] =
+        await Promise.all([
+          supabase.from('profiles').select('id, full_name, role').eq('id', currentUser.id).maybeSingle(),
+          supabase
+            .from('orders')
+            .select('id, status, total_cents, created_at')
+            .eq('user_id', currentUser.id)
+            .order('created_at', { ascending: false }),
+        ])
 
+      if (profileError) throw profileError
+      if (ordersError) throw ordersError
+      setProfile(userProfile)
+      setFullNameInput(userProfile?.full_name || '')
       setOrders(userOrders || [])
+    } catch (error) {
+      console.error('Unable to load customer account:', error)
+      toast.error(error instanceof Error ? error.message : 'Impossible de charger les informations du compte.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
-  }, [])
+  }, [router])
 
   useEffect(() => {
     loadAccountData()
@@ -74,39 +83,89 @@ export default function AccountPage() {
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
+    if (!fullNameInput.trim()) {
+      toast.error('Le nom complet ne peut pas être vide.')
+      return
+    }
 
     setUpdateLoading(true)
 
     try {
       const supabase = createClient()
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .update({
-          full_name: fullNameInput,
+          full_name: fullNameInput.trim(),
           updated_at: new Date().toISOString(),
         })
         .eq('id', user.id)
+        .select('id')
+        .maybeSingle()
 
       if (error) {
         throw error
       }
+      if (!data) throw new Error('Profil introuvable : aucune modification n’a été enregistrée.')
 
-      setProfile((prev) => (prev ? { ...prev, full_name: fullNameInput } : null))
+      setProfile((prev) => (prev ? { ...prev, full_name: fullNameInput.trim() } : null))
+      setFullNameInput(fullNameInput.trim())
       setIsEditing(false)
       toast.success('Profil mis à jour avec succès.')
-    } catch {
-      toast.error('Impossible d’enregistrer les modifications.')
+    } catch (error) {
+      console.error('Unable to update customer profile:', error)
+      toast.error(error instanceof Error ? error.message : 'Impossible d’enregistrer les modifications.')
     } finally {
       setUpdateLoading(false)
     }
   }
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user?.email) return
+    if (newPassword.length < 8) {
+      toast.error('Le nouveau mot de passe doit contenir au moins 8 caractères.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('La confirmation ne correspond pas au nouveau mot de passe.')
+      return
+    }
+
+    setPasswordLoading(true)
+    try {
+      const supabase = createClient()
+      const { error: reauthenticationError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      })
+      if (reauthenticationError) throw reauthenticationError
+
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) throw error
+
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      toast.success('Votre mot de passe a été modifié.')
+    } catch (error) {
+      console.error('Unable to update customer password:', error)
+      toast.error(error instanceof Error ? error.message : 'Impossible de modifier le mot de passe.')
+    } finally {
+      setPasswordLoading(false)
+    }
+  }
+
   const handleSignOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    toast.success('Vous avez été déconnecté.')
-    router.push('/login')
-    router.refresh()
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+      router.push('/login')
+      router.refresh()
+    } catch (error) {
+      console.error('Unable to sign out customer:', error)
+      toast.error(error instanceof Error ? error.message : 'Impossible de vous déconnecter.')
+    }
   }
 
   if (loading) {
@@ -167,6 +226,7 @@ export default function AccountPage() {
                   </label>
                   <input
                     type="text"
+                    maxLength={120}
                     value={fullNameInput}
                     onChange={(e) => setFullNameInput(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-100 focus:outline-none focus:border-amber-500"
@@ -202,8 +262,64 @@ export default function AccountPage() {
                   <span className="text-zinc-500 block text-[11px] uppercase tracking-wider">Nom complet</span>
                   <span className="text-zinc-100 font-medium">{profile?.full_name || '—'}</span>
                 </div>
+
               </div>
             )}
+          </div>
+
+          <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-6 backdrop-blur-md shadow-xl space-y-5">
+            <div className="flex items-center gap-2.5 border-b border-zinc-800/80 pb-4 font-serif text-lg font-bold text-amber-500">
+              <ShieldCheck className="h-5 w-5" />
+              Sécurité du compte
+            </div>
+            <p className="text-xs leading-relaxed text-zinc-400">
+              Confirmez votre mot de passe actuel avant d’en choisir un nouveau.
+            </p>
+            <form onSubmit={handleChangePassword} className="space-y-3">
+              <label className="block text-[11px] uppercase tracking-wider text-zinc-400">
+                Mot de passe actuel
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-xs text-zinc-100 focus:border-amber-500 focus:outline-none"
+                />
+              </label>
+              <label className="block text-[11px] uppercase tracking-wider text-zinc-400">
+                Nouveau mot de passe
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-xs text-zinc-100 focus:border-amber-500 focus:outline-none"
+                />
+              </label>
+              <label className="block text-[11px] uppercase tracking-wider text-zinc-400">
+                Confirmer le nouveau mot de passe
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-xs text-zinc-100 focus:border-amber-500 focus:outline-none"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={passwordLoading}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-amber-500/60 bg-amber-500/10 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-amber-300 transition-colors hover:bg-amber-500 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <LockKeyhole className="h-3.5 w-3.5" />
+                {passwordLoading ? 'Mise à jour…' : 'Modifier le mot de passe'}
+              </button>
+            </form>
           </div>
         </div>
 

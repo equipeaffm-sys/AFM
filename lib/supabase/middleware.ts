@@ -48,7 +48,7 @@ export async function updateSession(request: NextRequest) {
       }
     }
 
-    // 2. Protect /admin/* routes: must be logged in AND have role in allowedAdminRoles
+    // 2. Protect /admin/* routes: access is granted only by an explicit staff role.
     if (pathname.startsWith('/admin')) {
       if (!user) {
         url.pathname = '/login'
@@ -62,8 +62,8 @@ export async function updateSession(request: NextRequest) {
         .eq('id', user.id)
         .single()
 
-      const allowedAdminRoles = ['admin', 'super_admin', 'editor', 'support']
-      if (user.email !== 'admin@maison-lm.com' && (!profile || !allowedAdminRoles.includes(profile.role))) {
+      const allowedAdminRoles = ['super_admin', 'editor', 'support']
+      if (!profile || !allowedAdminRoles.includes(profile.role)) {
         url.pathname = '/'
         return NextResponse.redirect(url)
       }
@@ -71,7 +71,13 @@ export async function updateSession(request: NextRequest) {
 
     // 3. Redirect authenticated users away from /login
     if (pathname.startsWith('/login') && user) {
-      const redirectTo = url.searchParams.get('redirect') || '/account'
+      const requestedRedirect = url.searchParams.get('redirect') || '/account'
+      const redirectTo =
+        requestedRedirect.startsWith('/') &&
+        !requestedRedirect.startsWith('//') &&
+        !requestedRedirect.includes('\\')
+          ? requestedRedirect
+          : '/account'
       url.pathname = redirectTo
       url.searchParams.delete('redirect')
       return NextResponse.redirect(url)

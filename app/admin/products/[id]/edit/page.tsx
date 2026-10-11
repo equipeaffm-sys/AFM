@@ -36,11 +36,15 @@ export default function EditProductPage() {
             description: data.description || '',
             priceEuros: data.price_cents / 100,
             costPriceEuros: data.cost_price_cents ? data.cost_price_cents / 100 : 0,
+            salePriceEuros: data.sale_price_cents === null ? null : data.sale_price_cents / 100,
+            saleEndsAt: data.sale_ends_at ? data.sale_ends_at.slice(0, 10) : '',
             stock: data.stock,
+            lowStockThreshold: data.low_stock_threshold ?? 3,
             categoryName: data.category,
             categoryId: data.category_id || '',
             images: data.images || [],
             is_active: data.is_active ?? true,
+            is_featured: data.is_featured ?? false,
           })
         }
       } catch {
@@ -66,11 +70,18 @@ export default function EditProductPage() {
         description: formData.description,
         price_cents: Math.round(formData.priceEuros * 100),
         cost_price_cents: Math.round(formData.costPriceEuros * 100),
+        sale_price_cents:
+          formData.salePriceEuros === null ? null : Math.round(formData.salePriceEuros * 100),
+        sale_ends_at: formData.salePriceEuros === null || !formData.saleEndsAt
+          ? null
+          : `${formData.saleEndsAt}T23:59:59.999Z`,
         stock: formData.stock,
+        low_stock_threshold: formData.lowStockThreshold,
         category: formData.categoryName,
         category_id: formData.categoryId || null,
         images: formData.images,
         is_active: formData.is_active,
+        is_featured: formData.is_featured,
         updated_at: new Date().toISOString(),
       }
 

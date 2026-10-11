@@ -11,6 +11,9 @@ import { Product } from '@/lib/constants'
 export default function InventoryPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const lowStockProducts = products.filter(
+    (product) => product.stock <= (product.low_stock_threshold ?? 3)
+  )
 
   const loadProducts = async () => {
     setLoading(true)
@@ -72,8 +75,24 @@ export default function InventoryPage() {
               Inventaire du catalogue
             </h1>
             <p className="text-zinc-600 text-xs font-light">
-              Les quantités affichées proviennent du catalogue. Aucun seuil d’alerte de stock n’est configuré.
+              Les alertes sont calculées depuis le seuil configuré sur chaque fiche produit.
             </p>
+          </div>
+
+          <div className={`flex items-center justify-between gap-4 rounded-2xl border p-5 ${
+            lowStockProducts.length > 0
+              ? 'border-amber-300 bg-amber-50 text-amber-950'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-950'
+          }`}>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider">Alerte de réapprovisionnement</p>
+              <p className="mt-1 text-sm">
+                {lowStockProducts.length > 0
+                  ? `${lowStockProducts.length} produit(s) au seuil ou en dessous`
+                  : 'Aucun produit sous son seuil d’alerte.'}
+              </p>
+            </div>
+            <span className="font-serif text-3xl font-semibold">{lowStockProducts.length}</span>
           </div>
 
           <button
@@ -106,7 +125,7 @@ export default function InventoryPage() {
                   <tr>
                     <th className="py-4 px-6">Produit</th>
                     <th className="py-4 px-6">Rayon</th>
-                    <th className="py-4 px-6">Stock Actuel</th>
+                    <th className="py-4 px-6">Stock / Seuil</th>
                     <th className="py-4 px-6 text-right">Réapprovisionnement Rapide</th>
                   </tr>
                 </thead>
@@ -126,8 +145,15 @@ export default function InventoryPage() {
                         </span>
                       </td>
 
-                      <td className="py-4 px-6 font-mono font-bold text-sm text-zinc-950">
-                        {p.stock} pièce(s)
+                      <td className="py-4 px-6">
+                        <span className={`font-mono font-bold text-sm ${
+                          p.stock <= (p.low_stock_threshold ?? 3) ? 'text-amber-700' : 'text-zinc-950'
+                        }`}>
+                          {p.stock} pièce(s)
+                        </span>
+                        <span className="mt-1 block text-[10px] text-zinc-500">
+                          Seuil : {p.low_stock_threshold ?? 3}
+                        </span>
                       </td>
 
                       <td className="py-4 px-6 text-right space-x-2">

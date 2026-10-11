@@ -47,7 +47,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Master Account Auto-Elevation Trigger
+-- New accounts always start as customers. Grant staff roles manually through
+-- the Supabase SQL editor after verifying the account owner.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -56,13 +57,11 @@ BEGIN
     NEW.id,
     NEW.email,
     NEW.raw_user_meta_data->>'full_name',
-    CASE
-      WHEN NEW.email = 'admin@maison-lm.com' THEN 'super_admin'::user_role
-      ELSE 'customer'::user_role
-    END
+    'customer'::user_role
   )
   ON CONFLICT (id) DO UPDATE SET
-    role = CASE WHEN EXCLUDED.email = 'admin@maison-lm.com' THEN 'super_admin'::user_role ELSE public.profiles.role END;
+    email = EXCLUDED.email,
+    full_name = EXCLUDED.full_name;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -72,6 +71,18 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Backfill profiles for accounts that existed before the profile trigger.
+INSERT INTO public.profiles (id, email, full_name, role)
+SELECT
+  users.id,
+  users.email,
+  users.raw_user_meta_data->>'full_name',
+  'customer'::user_role
+FROM auth.users AS users
+ON CONFLICT (id) DO UPDATE SET
+  email = EXCLUDED.email,
+  full_name = COALESCE(public.profiles.full_name, EXCLUDED.full_name);
 
 -- 2. AUDIT TRAIL LOGS TABLE
 CREATE TABLE IF NOT EXISTS public.audit_logs (
@@ -222,9 +233,16 @@ ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
 
--- Profiles Policy: Users read own or SuperAdmin full access
-CREATE POLICY "Public read profiles" ON public.profiles FOR SELECT USING (true);
-CREATE POLICY "SuperAdmin modify profiles" ON public.profiles FOR ALL USING (public.is_super_admin());
+-- Profiles Policy: no public profile access; users can only edit their own
+-- non-role fields, while Super Admins manage staff roles.
+CREATE POLICY "Users read own or admins read profiles" ON public.profiles
+  FOR SELECT USING (id = auth.uid() OR public.is_admin());
+CREATE POLICY "Users update own profile without role changes" ON public.profiles
+  FOR UPDATE USING (id = auth.uid())
+  WITH CHECK (id = auth.uid() AND role = public.get_user_role());
+CREATE POLICY "SuperAdmin update profiles" ON public.profiles
+  FOR UPDATE USING (public.is_super_admin())
+  WITH CHECK (public.is_super_admin());
 
 -- Audit Logs Policy
 CREATE POLICY "Admins view audit logs" ON public.audit_logs FOR SELECT USING (public.is_admin());
@@ -255,3 +273,11 @@ CREATE POLICY "SuperAdmin full access site settings" ON public.site_settings FOR
 CREATE POLICY "Users view own orders or admin" ON public.orders FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
 CREATE POLICY "Users create own orders" ON public.orders FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Support/Editor/SuperAdmin update orders" ON public.orders FOR ALL USING (public.is_admin());
+
+CREATE POLICY "Users view own order items or admin" ON public.order_items
+  FOR SELECT USING (
+    public.is_admin() OR EXISTS (
+      SELECT 1 FROM public.orders
+      WHERE orders.id = order_items.order_id AND orders.user_id = auth.uid()
+    )
+  );
