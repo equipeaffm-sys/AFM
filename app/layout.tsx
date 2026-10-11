@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import localFont from "next/font/local";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CookieBanner from "@/components/CookieBanner";
@@ -8,9 +9,26 @@ import { CurrencyProvider } from "@/components/CurrencyContext";
 import { LanguageProvider } from "@/components/LanguageContext";
 import { CartDrawer } from "@/components/CartDrawer";
 import ChatWidget from "@/components/ChatWidget";
+import InteractiveEffects from "@/components/InteractiveEffects";
+import ScrollUtilities from "@/components/ScrollUtilities";
+import PageTransitions from "@/components/PageTransitions";
 import { Toaster } from "react-hot-toast";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://lm-maison.com";
+
+const geistSans = localFont({
+  src: "./fonts/GeistVF.woff",
+  variable: "--font-geist-sans",
+  display: "swap",
+  weight: "100 900",
+});
+
+const geistMono = localFont({
+  src: "./fonts/GeistMonoVF.woff",
+  variable: "--font-geist-mono",
+  display: "swap",
+  weight: "100 900",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -45,7 +63,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr">
-      <body className="bg-background text-foreground antialiased min-h-screen flex flex-col justify-between">
+      <body className={`${geistSans.variable} ${geistMono.variable} flex min-h-screen flex-col justify-between bg-background text-foreground antialiased`}>
         <LanguageProvider>
           <CurrencyProvider>
             <CartProvider>
@@ -56,13 +74,17 @@ export default function RootLayout({
                     background: '#18181b',
                     color: '#f4f4f5',
                     border: '1px solid #27272a',
-                    fontFamily: 'serif',
+                    fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
                     fontSize: '12px',
                   },
                 }}
               />
               <Navbar />
-              <main className="flex-grow">{children}</main>
+              <InteractiveEffects />
+              <ScrollUtilities />
+              <main className="flex-grow">
+                <PageTransitions>{children}</PageTransitions>
+              </main>
               <CartDrawer />
               <ChatWidget />
               <CookieBanner />

@@ -23,8 +23,9 @@ const config: Config = {
         },
       },
       fontFamily: {
-        serif: ["Playfair Display", "Didot", "Bodoni MT", "Georgia", "serif"],
-        sans: ["Plus Jakarta Sans", "Inter", "system-ui", "-apple-system", "sans-serif"],
+        serif: ["Georgia", "Iowan Old Style", "Times New Roman", "serif"],
+        sans: ["var(--font-geist-sans)", "system-ui", "-apple-system", "sans-serif"],
+        mono: ["var(--font-geist-mono)", "ui-monospace", "monospace"],
       },
       letterSpacing: {
         widest: ".25em",

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ShoppingBag } from 'lucide-react'
 
 export default function NotFound() {
   return (
@@ -17,10 +17,17 @@ export default function NotFound() {
           </p>
         </div>
 
-        <div className="pt-2">
+        <div className="flex flex-col justify-center gap-3 pt-2 sm:flex-row">
+          <Link
+            href="/products"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#665d4d] px-6 py-3 text-xs font-semibold uppercase tracking-widest text-zinc-100 shadow-lg transition-all hover:bg-[#756a56]"
+          >
+            <ShoppingBag className="w-4 h-4" />
+            Voir le catalogue
+          </Link>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 rounded-lg bg-[#665d4d] px-6 py-3 text-xs font-semibold uppercase tracking-widest text-zinc-100 shadow-lg transition-all hover:bg-[#756a56]"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 px-6 py-3 text-xs font-semibold uppercase tracking-widest text-zinc-300 transition-all hover:border-[#8f8065] hover:text-white"
           >
             <ArrowLeft className="w-4 h-4" />
             Retourner à l&apos;accueil

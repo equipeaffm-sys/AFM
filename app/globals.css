@@ -9,14 +9,19 @@
   --accent-soft: #34312b;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 a {
@@ -37,16 +42,127 @@ button {
 }
 
 .motion-card {
+  position: relative;
   animation: motion-rise 550ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
   transition:
-    transform 350ms cubic-bezier(0.2, 0.75, 0.25, 1),
+    transform 420ms cubic-bezier(0.2, 0.75, 0.25, 1),
     box-shadow 350ms ease,
     border-color 250ms ease;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.motion-card::after {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border-radius: inherit;
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at var(--shine-x, 50%) var(--shine-y, 50%),
+    rgba(218, 197, 158, 0.12),
+    transparent 42%
+  );
+  transition: opacity 250ms ease;
+}
+
+.motion-card.is-tilting::after {
+  opacity: 1;
 }
 
 .motion-card:hover {
-  transform: translateY(-5px);
+  transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) translateY(-4px);
   box-shadow: 0 18px 42px -22px rgba(50, 38, 22, 0.38);
+}
+
+.motion-card.is-tilting {
+  transition:
+    transform 100ms ease-out,
+    box-shadow 250ms ease,
+    border-color 250ms ease;
+}
+
+.glow-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  width: 250px;
+  height: 250px;
+  border-radius: 50%;
+  opacity: 0.34;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(182, 161, 125, 0.17) 0%, rgba(182, 161, 125, 0.07) 34%, transparent 72%);
+  transition:
+    width 280ms ease,
+    height 280ms ease,
+    opacity 280ms ease,
+    background 280ms ease;
+  will-change: transform;
+}
+
+.glow-cursor.is-interactive {
+  width: 340px;
+  height: 340px;
+  opacity: 0.52;
+  background: radial-gradient(circle, rgba(194, 177, 143, 0.2) 0%, rgba(182, 161, 125, 0.08) 38%, transparent 72%);
+}
+
+.glow-cursor.is-hidden {
+  opacity: 0;
+}
+
+.magnetic-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 80;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(210, 190, 151, 0.72);
+  border-radius: 50%;
+  background: rgba(182, 161, 125, 0.08);
+  box-shadow: 0 0 16px rgba(182, 161, 125, 0.16);
+  opacity: 1;
+  pointer-events: none;
+  transition:
+    width 180ms ease,
+    height 180ms ease,
+    opacity 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease;
+  will-change: transform;
+}
+
+.magnetic-cursor.is-interactive {
+  width: 34px;
+  height: 34px;
+  border-color: rgba(224, 205, 169, 0.9);
+  background: rgba(182, 161, 125, 0.18);
+}
+
+.magnetic-cursor.is-hidden {
+  opacity: 0;
+}
+
+body.has-custom-cursor,
+body.has-custom-cursor a,
+body.has-custom-cursor button,
+body.has-custom-cursor [role="button"] {
+  cursor: none;
+}
+
+body.has-custom-cursor input,
+body.has-custom-cursor textarea,
+body.has-custom-cursor [contenteditable="true"] {
+  cursor: text;
+}
+
+.reading-progress {
+  transform: scaleX(var(--reading-progress, 0));
+  transform-origin: left center;
 }
 
 .motion-card img {
@@ -54,7 +170,7 @@ button {
 }
 
 .motion-card:hover img {
-  transform: scale(1.045);
+  transform: scale(1.03);
 }
 
 .motion-link {
@@ -68,6 +184,235 @@ button {
 
 .motion-link:hover {
   transform: translateY(-1px);
+}
+
+.animated-underline {
+  position: relative;
+}
+
+.animated-underline::after {
+  position: absolute;
+  right: 0;
+  bottom: -3px;
+  left: 0;
+  height: 1px;
+  content: "";
+  transform: scaleX(0);
+  transform-origin: left;
+  background: currentColor;
+  transition: transform 260ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.animated-underline:hover::after,
+.animated-underline:focus-visible::after {
+  transform: scaleX(1);
+}
+
+.fluid-heading {
+  font-size: clamp(1.85rem, 4vw, 3.5rem);
+  transition: letter-spacing 300ms ease;
+}
+
+.letterspace-hover:hover {
+  letter-spacing: 0.025em;
+}
+
+.editorial-copy::first-letter {
+  color: #c2b18f;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.65em;
+  font-weight: 500;
+  line-height: 0.85;
+  padding-right: 0.05em;
+}
+
+.nav-icon-control svg {
+  transition: transform 220ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.nav-icon-control:hover svg {
+  transform: scale(1.08);
+}
+
+button:active svg,
+a:active svg {
+  animation: icon-spring 420ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.cart-count-pulse {
+  animation: cart-count-pulse 420ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.cart-backdrop {
+  animation: cart-backdrop-in 220ms ease-out both;
+}
+
+.cart-panel {
+  animation: cart-panel-in 280ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.button-label {
+  display: grid;
+  overflow: hidden;
+  line-height: 1.25;
+}
+
+.button-label > span {
+  grid-area: 1 / 1;
+  transition:
+    transform 250ms cubic-bezier(0.2, 0.75, 0.25, 1),
+    color 250ms ease;
+}
+
+.button-label > span:last-child {
+  color: #806d4f;
+  transform: translateY(125%);
+}
+
+.button-sheen {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.button-sheen > * {
+  position: relative;
+  z-index: 1;
+}
+
+.button-sheen::after {
+  position: absolute;
+  z-index: 0;
+  top: -80%;
+  bottom: -80%;
+  left: -40%;
+  width: 24%;
+  content: "";
+  transform: translateX(-250%) rotate(18deg);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 247, 225, 0.22),
+    transparent
+  );
+  animation: button-shimmer 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.button-sheen:hover .button-label > span:first-child {
+  transform: translateY(-125%);
+}
+
+.button-sheen:hover .button-label > span:last-child {
+  transform: translateY(0);
+}
+
+.page-transition {
+  animation: page-enter 260ms ease-out both;
+}
+
+::view-transition-old(root) {
+  animation: page-exit 180ms ease-in both;
+}
+
+::view-transition-new(root) {
+  animation: page-enter 260ms ease-out both;
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: rgba(255, 255, 255, 0.055);
+}
+
+.skeleton-shimmer::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  transform: translateX(-100%);
+  background: linear-gradient(105deg, transparent 20%, rgba(225, 219, 207, 0.1) 48%, transparent 76%);
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes page-exit {
+  to {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes skeleton-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes button-shimmer {
+  0%,
+  72% {
+    transform: translateX(-250%) rotate(18deg);
+  }
+  100% {
+    transform: translateX(650%) rotate(18deg);
+  }
+}
+
+@keyframes icon-spring {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(0.84) rotate(-5deg);
+  }
+  75% {
+    transform: scale(1.12) rotate(3deg);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes cart-count-pulse {
+  0% {
+    transform: scale(0.7);
+  }
+  65% {
+    transform: scale(1.22);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes cart-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cart-panel-in {
+  from {
+    opacity: 0.8;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes motion-rise {
@@ -97,6 +442,21 @@ button {
   border: 1px solid rgba(182, 161, 125, 0.2);
 }
 
+@media (hover: none), (pointer: coarse) {
+  .glow-cursor {
+    display: none;
+  }
+
+  .magnetic-cursor {
+    display: none;
+  }
+
+  .motion-card,
+  .motion-card.is-tilting {
+    transform: none;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -115,6 +475,30 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .glow-cursor {
+    display: none;
+  }
+
+  .magnetic-cursor {
+    display: none;
+  }
+
+  .page-transition,
+  .skeleton-shimmer::after,
+  .cart-backdrop,
+  .cart-panel {
+    animation: none !important;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+
   *,
   *::before,
   *::after {

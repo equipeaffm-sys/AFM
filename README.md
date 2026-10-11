@@ -29,7 +29,7 @@ pas définies. Avant de l’activer, renseignez également les vraies clés Stri
 
 Le widget fournit des réponses locales aux questions fréquentes (catalogue, compte,
 commandes, livraison et retours) et fonctionne sans clé ni service externe. Pour activer les
-réponses IA avec Groq, définissez `CHAT_API_KEY` dans `.env.local`. L’endpoint Groq compatible
+réponses IA avec Groq, définissez `CHAT_API_KEY` (ou `GROQ_API_KEY`) dans `.env.local`. L’endpoint Groq compatible
 OpenAI et le modèle `llama-3.3-70b-versatile` sont utilisés par défaut; vous pouvez les
 remplacer avec `CHAT_API_URL` et `CHAT_MODEL` si nécessaire. Un exemple est disponible dans
 `.env.local.example`. Redémarrez le serveur après modification. La clé est lue uniquement

@@ -1,25 +1,23 @@
 export default function ProductSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+    <div aria-label="Chargement des produits" aria-busy="true" className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="bg-[#242523] border border-white/[0.08] rounded-2xl overflow-hidden flex flex-col shadow-sm animate-pulse relative"
+          className="flex animate-pulse flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-[#242523] shadow-sm"
         >
-          {/* Shimmer wave effect */}
-          <div className="h-80 w-full bg-[#2d2e2b] relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent -translate-x-full animate-[shimmer_1.5s_infinite]" />
-            <div className="absolute top-4 left-4 h-6 w-28 bg-white/[0.08] rounded-full" />
+          <div className="skeleton-shimmer relative aspect-[4/5] w-full overflow-hidden bg-[#2d2e2b]">
+            <div className="absolute left-3 top-3 h-5 w-20 rounded-full bg-white/[0.08] sm:left-4 sm:top-4 sm:h-6 sm:w-28" />
           </div>
-          <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
-            <div className="space-y-3">
-              <div className="h-6 w-3/4 bg-white/[0.08] rounded" />
-              <div className="h-4 w-full bg-white/[0.04] rounded" />
-              <div className="h-4 w-2/3 bg-white/[0.04] rounded" />
+          <div className="flex flex-1 flex-col justify-between space-y-3 p-3.5 sm:space-y-4 sm:p-5">
+            <div className="space-y-2.5 sm:space-y-3">
+              <div className="skeleton-shimmer h-4 w-3/4 rounded sm:h-6" />
+              <div className="skeleton-shimmer h-3 w-full rounded sm:h-4" />
+              <div className="skeleton-shimmer h-3 w-2/3 rounded sm:h-4" />
             </div>
-            <div className="pt-4 border-t border-white/[0.08] flex items-center justify-between">
-              <div className="h-6 w-24 bg-white/[0.08] rounded" />
-              <div className="h-8 w-28 bg-[#665d4d] rounded-xl" />
+            <div className="flex items-center justify-between gap-2 border-t border-white/[0.08] pt-3">
+              <div className="skeleton-shimmer h-4 w-16 rounded sm:h-6 sm:w-24" />
+              <div className="skeleton-shimmer h-7 w-16 rounded-lg sm:h-8 sm:w-28" />
             </div>
           </div>
         </div>

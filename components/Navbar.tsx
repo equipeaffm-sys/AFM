@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isHidden, setIsHidden] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
 
@@ -21,11 +22,44 @@ export default function Navbar() {
   const { language, t } = useLanguage();
 
   useEffect(() => {
+    let previousScrollY = window.scrollY
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
+      const currentScrollY = window.scrollY
+      setIsScrolled(currentScrollY > 20)
+
+      if (
+        currentScrollY < 80 ||
+        currentScrollY < previousScrollY - 6 ||
+        mobileMenuOpen ||
+        searchModalOpen ||
+        document.activeElement?.closest('header')
+      ) {
+        setIsHidden(false)
+      } else if (currentScrollY > previousScrollY + 8) {
+        setIsHidden(true)
+      }
+
+      previousScrollY = currentScrollY
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  }, [mobileMenuOpen, searchModalOpen]);
+
+  useEffect(() => {
+    const handleSearchShortcut = (event: KeyboardEvent) => {
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === 'k' &&
+        !event.altKey
+      ) {
+        event.preventDefault();
+        setIsHidden(false);
+        setSearchModalOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleSearchShortcut);
+    return () => window.removeEventListener('keydown', handleSearchShortcut);
   }, []);
 
   // Lock background scroll when mobile menu drawer is open
@@ -71,7 +105,12 @@ export default function Navbar() {
     "";
 
   return (
-    <header className="sticky top-0 left-0 right-0 z-40 w-full border-b border-white/[0.07] bg-[#1b1c1b]/95 shadow-[0_4px_24px_-18px_rgba(0,0,0,0.8)] backdrop-blur-xl transition-all duration-300">
+    <header
+      onFocusCapture={() => setIsHidden(false)}
+      className={`sticky top-0 left-0 right-0 z-40 w-full border-b border-white/[0.07] bg-transparent shadow-[0_4px_24px_-18px_rgba(0,0,0,0.8)] transition-transform duration-300 ${
+        isHidden && !mobileMenuOpen && !searchModalOpen ? '-translate-y-full' : 'translate-y-0'
+      }`}
+    >
       {/* Infinite Marquee Top Announcement Bar (Strictly i18n Single Language) */}
       {announcementActive && activeMarqueeText && (
         <div className="bg-[#222320] text-[#b6a17d] border-b border-white/[0.06] text-[10px] uppercase font-semibold tracking-[0.25em] py-1.5 overflow-hidden whitespace-nowrap">
@@ -89,7 +128,9 @@ export default function Navbar() {
       {/* Main Navigation Header */}
       <div
         className={`transition-all duration-300 text-zinc-200 ${
-          isScrolled ? "py-2.5 bg-[#1b1c1b]/95" : "py-3.5 bg-[#1b1c1b]/90"
+          isScrolled
+            ? "py-2.5 border-b border-white/[0.08] bg-[#191a19]/75 shadow-[0_8px_32px_-20px_rgba(0,0,0,0.85)] backdrop-blur-2xl"
+            : "py-3.5 bg-[#1b1c1b]/95 backdrop-blur-md"
         }`}
       >
         <nav className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between text-[#e6e3dc]">
@@ -97,7 +138,7 @@ export default function Navbar() {
           <div className="hidden md:flex items-center space-x-8 text-xs tracking-[0.2em] uppercase font-medium text-[#d0cdc5]">
             <Link
               href="/products"
-              className="motion-link relative py-2 text-[#d0cdc5] after:absolute after:inset-x-0 after:bottom-0 after:h-px after:origin-left after:scale-x-0 after:bg-[#b6a17d] after:transition-transform hover:text-[#e8e5de] hover:after:scale-x-100"
+              className="motion-link animated-underline relative py-2 text-[#d0cdc5] after:absolute after:inset-x-0 after:bottom-0 after:h-px after:origin-left after:scale-x-0 after:bg-[#b6a17d] after:transition-transform hover:text-[#e8e5de] hover:after:scale-x-100"
             >
               {t.catalog}
             </Link>
@@ -120,9 +161,12 @@ export default function Navbar() {
           <div className="flex items-center space-x-4 md:space-x-6 text-zinc-200">
             {/* Live Search Trigger Button */}
             <button
-              onClick={() => setSearchModalOpen(true)}
+              onClick={() => {
+                setIsHidden(false)
+                setSearchModalOpen(true)
+              }}
               aria-label="Rechercher"
-              className="motion-link p-1 text-[#c9c6be] hover:text-[#e8e5de] hidden sm:block cursor-pointer"
+              className="motion-link nav-icon-control p-1 text-[#c9c6be] hover:text-[#e8e5de] hidden sm:block cursor-pointer"
             >
               <Search className="w-5 h-5 stroke-[1.5]" />
             </button>
@@ -130,7 +174,7 @@ export default function Navbar() {
             <Link
               href="/account"
               aria-label="Compte client"
-              className="motion-link p-1 text-[#c9c6be] hover:text-[#e8e5de] hidden sm:block"
+              className="motion-link nav-icon-control p-1 text-[#c9c6be] hover:text-[#e8e5de] hidden sm:block"
             >
               <User className="w-5 h-5 stroke-[1.5]" />
             </Link>
@@ -138,10 +182,10 @@ export default function Navbar() {
             <button
               onClick={toggleCart}
               aria-label="Panier d'achats"
-              className="motion-link relative p-1 text-[#c9c6be] hover:text-[#e8e5de] cursor-pointer"
+              className="motion-link nav-icon-control relative p-1 text-[#c9c6be] hover:text-[#e8e5de] cursor-pointer"
             >
               <ShoppingBag className="w-5 h-5 stroke-[1.5]" />
-              <span className="absolute -top-1 -right-1 bg-[#b6a17d] text-[#191a19] text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center shadow-sm">
+              <span key={totalCount} className="cart-count-pulse absolute -top-1 -right-1 bg-[#b6a17d] text-[#191a19] text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center shadow-sm">
                 {totalCount}
               </span>
             </button>
@@ -168,6 +212,7 @@ export default function Navbar() {
                 <button
                   onClick={() => {
                     setMobileMenuOpen(false);
+                    setIsHidden(false);
                     setSearchModalOpen(true);
                   }}
                   className="py-2 text-[#c2b18f] font-bold flex items-center justify-center gap-2 cursor-pointer"

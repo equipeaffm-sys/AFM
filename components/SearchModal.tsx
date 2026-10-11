@@ -20,9 +20,9 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const router = useRouter()
   const { formatPrice } = useCurrency()
   const inputRef = useRef<HTMLInputElement>(null)
+  const catalogLoadedRef = useRef(false)
 
   const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [results, setResults] = useState<Product[]>([])
   const [loading, setLoading] = useState(false)
   const [history, setHistory] = useState<string[]>([])
@@ -51,60 +51,53 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
       // Ignore
     }
 
-    // Fetch initial products catalog
     async function loadCatalog() {
+      if (catalogLoadedRef.current) return
+      setLoading(true)
       try {
         const supabase = createClient()
         const { data, error } = await supabase
           .from('products')
           .select('*')
           .eq('is_active', true)
+          .order('created_at', { ascending: false })
 
         if (error) throw error
         setAllProducts(data || [])
         setCatalogError(false)
+        catalogLoadedRef.current = true
       } catch (error) {
         console.error('Unable to load products for search:', error)
         setAllProducts([])
         setCatalogError(true)
+      } finally {
+        setLoading(false)
       }
     }
-    loadCatalog()
+    void loadCatalog()
 
     return () => {
       document.body.style.overflow = 'unset'
     }
   }, [isOpen])
 
-  // Debounce search query input (250ms)
+  // Search the already-loaded catalogue synchronously as the visitor types.
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedQuery(query.trim())
-    }, 250)
-    return () => clearTimeout(handler)
-  }, [query])
-
-  // Perform search on debounced query changes
-  useEffect(() => {
-    if (!debouncedQuery) {
+    const terms = normalizeSearchText(query).trim().split(/\s+/).filter(Boolean)
+    if (terms.length === 0) {
       setResults([])
-      setLoading(false)
       return
     }
 
-    setLoading(true)
-    const lower = debouncedQuery.toLowerCase()
-
     const filtered = allProducts.filter((product) => {
-      const titleMatch = product.title.toLowerCase().includes(lower)
-      const catMatch = product.category.toLowerCase().includes(lower)
-      const descMatch = product.description.toLowerCase().includes(lower)
-      return titleMatch || catMatch || descMatch
+      const searchableText = normalizeSearchText(
+        `${product.title} ${product.category} ${product.description || ''}`
+      )
+      return terms.every((term) => searchableText.includes(term))
     })
 
     setResults(filtered)
-    setLoading(false)
-  }, [debouncedQuery, allProducts])
+  }, [query, allProducts])
 
   // Save term to search history
   const saveSearchTerm = useCallback((term: string) => {
@@ -155,19 +148,28 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-[#111210]/95 backdrop-blur-xl flex flex-col justify-start animate-fadeIn transition-all duration-300"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-3 backdrop-blur-md sm:p-6"
       onKeyDown={handleKeyDown}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
     >
-      {/* Top Bar with Input */}
-      <div className="w-full bg-[#20211f] border-b border-white/[0.08] shadow-2xl py-6 px-4 sm:px-8">
-        <div className="max-w-4xl mx-auto flex items-center gap-4">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label="Recherche dans le catalogue"
+        className="motion-rise flex max-h-[min(760px,calc(100dvh-2rem))] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/[0.12] bg-[#20211f] shadow-[0_30px_100px_-30px_rgba(0,0,0,0.9)] sm:max-h-[min(760px,calc(100dvh-3rem))]"
+      >
+        <div className="w-full border-b border-white/[0.08] bg-[#20211f] px-4 py-5 shadow-2xl sm:px-7">
+        <div className="mx-auto flex max-w-4xl items-center gap-4">
           <Search className="w-6 h-6 text-[#b6a17d] shrink-0" />
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher une création, un matériau, un rayon (ex: Cabas, Or 24k)..."
+            placeholder="Rechercher un article ou une catégorie…"
+            aria-label="Rechercher un article ou une catégorie"
             className="flex-1 bg-transparent text-lg sm:text-2xl font-serif text-zinc-100 placeholder-zinc-500 focus:outline-none"
           />
           {query && (
@@ -187,10 +189,9 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
             <X className="w-6 h-6" />
           </button>
         </div>
-      </div>
+        </div>
 
-      {/* Main Content Body */}
-      <div className="flex-1 overflow-y-auto max-w-4xl w-full mx-auto p-4 sm:p-8 space-y-8">
+      <div className="w-full flex-1 overflow-y-auto p-4 sm:p-7">
         {/* State A: Empty Query -> History & Suggestions */}
         {!query && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-zinc-200">
@@ -199,7 +200,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#c2b18f]">
                   <History className="w-4 h-4" />
-                  Recherches Récents
+                  Recherches récentes
                 </div>
                 <div className="space-y-2">
                   {history.map((item) => (
@@ -247,7 +248,11 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
               )}
             </div>
 
-            {results.length === 0 && !loading ? (
+            {loading ? (
+              <div role="status" className="py-12 text-center text-sm text-zinc-400">
+                Chargement du catalogue…
+              </div>
+            ) : results.length === 0 ? (
               <div className="py-12 text-center text-zinc-400 space-y-3">
                 <p className="font-serif text-lg">
                   {catalogError
@@ -255,7 +260,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                     : `Aucun article ne correspond à « ${query} ».`}
                 </p>
                 <p className="text-xs font-light">
-                  Essayez un autre terme ou parcourez les catégories disponibles dans la boutique.
+                  Essayez un autre terme ou parcourez le catalogue.
                 </p>
               </div>
             ) : (
@@ -315,6 +320,11 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
           </div>
         )}
       </div>
+      </section>
     </div>
   )
+}
+
+function normalizeSearchText(value: string): string {
+  return value.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }

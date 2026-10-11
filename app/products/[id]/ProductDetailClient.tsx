@@ -40,6 +40,8 @@ export default function ProductDetailClient({ productId }: { productId: string }
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [addedToCart, setAddedToCart] = useState(false)
   const [isZoomed, setIsZoomed] = useState(false)
+  const [hoverZoom, setHoverZoom] = useState(false)
+  const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 })
   const [showStickyBar, setShowStickyBar] = useState(false)
 
   const primaryBuyButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -115,7 +117,7 @@ export default function ProductDetailClient({ productId }: { productId: string }
     openCart()
     setTimeout(() => {
       setAddedToCart(false)
-    }, 3000)
+    }, 1000)
   }
 
   if (loading) {
@@ -179,15 +181,25 @@ export default function ProductDetailClient({ productId }: { productId: string }
 
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Breadcrumb Back Link */}
-        <div>
+        <nav aria-label="Fil d’Ariane" className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+          <Link href="/" className="transition-colors hover:text-[#c2b18f]">Accueil</Link>
+          <span aria-hidden="true">/</span>
+          <Link
+            href={`/products?category=${encodeURIComponent(product.category)}`}
+            className="transition-colors hover:text-[#c2b18f]"
+          >
+            {product.category}
+          </Link>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page" className="max-w-[55vw] truncate text-zinc-300">{product.title}</span>
           <Link
             href="/products"
-            className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-zinc-400 hover:text-[#c2b18f] transition-colors"
+            className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 transition-colors hover:text-[#c2b18f]"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             {t.catalog}
           </Link>
-        </div>
+        </nav>
 
         {/* Product Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-start">
@@ -195,7 +207,21 @@ export default function ProductDetailClient({ productId }: { productId: string }
           <div className="space-y-4">
             <div
               className="relative h-[420px] sm:h-[600px] w-full rounded-2xl overflow-hidden border border-white/[0.08] bg-[#2d2e2b] shadow-xl cursor-zoom-in group"
-              onClick={() => setIsZoomed(!isZoomed)}
+              onPointerMove={(event) => {
+                if (event.pointerType !== 'mouse') return
+                const rect = event.currentTarget.getBoundingClientRect()
+                setZoomOrigin({
+                  x: ((event.clientX - rect.left) / rect.width) * 100,
+                  y: ((event.clientY - rect.top) / rect.height) * 100,
+                })
+                setHoverZoom(true)
+              }}
+              onPointerLeave={() => setHoverZoom(false)}
+              onClick={() => {
+                if (window.matchMedia('(hover: none)').matches) {
+                  setIsZoomed((zoomed) => !zoomed)
+                }
+              }}
             >
               {galleryImages.length > 0 && (
                 <Image
@@ -207,8 +233,9 @@ export default function ProductDetailClient({ productId }: { productId: string }
                   placeholder="blur"
                   blurDataURL={BLUR_DATA_URL}
                   className={`object-cover transition-transform duration-500 ease-out ${
-                    isZoomed ? 'scale-150' : 'scale-100'
+                    isZoomed || hoverZoom ? 'scale-150' : 'scale-100'
                   }`}
+                  style={{ transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%` }}
                 />
               )}
               <div className="absolute top-4 left-4 flex gap-2">
@@ -269,7 +296,7 @@ export default function ProductDetailClient({ productId }: { productId: string }
           {/* Details Section */}
           <div className="space-y-8 bg-[#222321] p-8 sm:p-10 border border-white/[0.08] rounded-2xl shadow-xl">
             <div className="space-y-3">
-              <h1 className="text-3xl sm:text-5xl font-serif font-medium text-zinc-100 leading-tight">
+              <h1 className="fluid-heading letterspace-hover font-serif font-medium text-zinc-100 leading-tight">
               {product.title}
               </h1>
 
@@ -327,7 +354,7 @@ export default function ProductDetailClient({ productId }: { productId: string }
 
             <div className="border-b border-white/[0.08] pb-6 space-y-4">
               <h2 className="text-xs uppercase tracking-widest text-zinc-500 font-bold">Description</h2>
-              <p className="text-zinc-300 text-sm font-light leading-relaxed">
+              <p className="editorial-copy text-zinc-300 text-sm font-light leading-relaxed">
                 {product.description}
               </p>
             </div>
@@ -359,7 +386,7 @@ export default function ProductDetailClient({ productId }: { productId: string }
                 ref={primaryBuyButtonRef}
                 onClick={handleAddToCart}
                 disabled={activeStock === 0}
-                className={`w-full py-4 px-8 rounded-xl text-xs font-bold uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-3 shadow-xl ${
+                className={`button-sheen w-full py-4 px-8 rounded-xl text-xs font-bold uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-3 shadow-xl ${
                   addedToCart
                     ? 'bg-emerald-600 text-white'
                     : 'bg-[#665d4d] text-[#eeeae2] hover:bg-[#77705f]'
@@ -373,7 +400,10 @@ export default function ProductDetailClient({ productId }: { productId: string }
                 ) : (
                   <>
                     <ShoppingBag className="w-5 h-5" />
-                    {t.addToCart}
+                    <span className="button-label">
+                      <span>{t.addToCart}</span>
+                      <span aria-hidden="true">{t.addToCart}</span>
+                    </span>
                   </>
                 )}
               </button>

@@ -1,8 +1,9 @@
 'use client'
 
 import React from 'react'
+import { useEffect } from 'react'
 import Image from 'next/image'
-import { X, Trash2, Plus, Minus, ShoppingBag } from 'lucide-react'
+import { X, Trash2, Plus, Minus, ShoppingBag, ImageOff } from 'lucide-react'
 import { useCart } from './CartContext'
 import { useCurrency } from './CurrencyContext'
 import { useLanguage } from './LanguageContext'
@@ -21,18 +22,39 @@ export const CartDrawer: React.FC = () => {
   const { formatPrice } = useCurrency()
   const { t } = useLanguage()
 
+  useEffect(() => {
+    if (!isCartOpen) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsCartOpen(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isCartOpen, setIsCartOpen])
+
   if (!isCartOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden animate-fadeIn">
+    <div className="fixed inset-0 z-50 overflow-hidden">
       {/* Backdrop with Backdrop Blur */}
       <div
-        className="fixed inset-0 bg-black/75 backdrop-blur-md transition-opacity duration-300"
+        className="cart-backdrop fixed inset-0 bg-black/75 backdrop-blur-md"
         onClick={() => setIsCartOpen(false)}
       />
 
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md bg-[#20211f] border-l border-white/[0.08] text-zinc-200 flex flex-col shadow-2xl transform transition-transform duration-300 ease-out translate-x-0">
+      <div className="fixed inset-y-0 right-0 flex max-w-full pl-4 sm:pl-10">
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-label={t.cartTitle}
+          className="cart-panel flex w-screen max-w-md flex-col border-l border-white/[0.08] bg-[#20211f] text-zinc-200 shadow-2xl"
+        >
           {/* Drawer Header */}
           <div className="p-6 border-b border-white/[0.08] flex items-center justify-between bg-[#242523]">
             <div className="flex items-center gap-3">
@@ -69,12 +91,19 @@ export const CartDrawer: React.FC = () => {
                   className="flex gap-4 bg-[#252623] p-4 rounded-xl border border-white/[0.08] shadow-sm transition-all hover:border-[#8f8065]/60"
                 >
                   <div className="relative w-20 h-20 bg-[#30312e] rounded-lg overflow-hidden shrink-0 border border-white/[0.08]">
-                    <Image
-                      src={item.image}
-                      alt={item.title}
-                      fill
-                      className="object-cover"
-                    />
+                    {item.image ? (
+                      <Image
+                        src={item.image}
+                        alt={item.title}
+                        fill
+                        sizes="80px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-zinc-500">
+                        <ImageOff className="h-5 w-5" aria-hidden="true" />
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex-1 flex flex-col justify-between">
@@ -151,7 +180,7 @@ export const CartDrawer: React.FC = () => {
               </div>
             </div>
           )}
-        </div>
+        </section>
       </div>
     </div>
   )

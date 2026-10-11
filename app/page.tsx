@@ -94,7 +94,7 @@ export default function HomePage() {
                   <Sparkles className="h-3.5 w-3.5 text-[#c2b18f]" />
                   {t.heroBadge}
                 </div>
-                <h1 className="motion-rise font-serif text-4xl font-medium leading-[1.08] tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl" style={{ animationDelay: '100ms' }}>
+                <h1 className="fluid-heading letterspace-hover motion-rise font-serif font-medium leading-[1.08] tracking-tight text-white" style={{ animationDelay: '100ms' }}>
                   {siteSettings.hero_title}
                   <span className="mt-2 block font-normal italic text-[#c2b18f]">
                     Maison L&amp;M
@@ -106,16 +106,22 @@ export default function HomePage() {
                 <div className="motion-rise flex flex-col items-stretch gap-3 pt-2 sm:flex-row sm:items-center" style={{ animationDelay: '260ms' }}>
                 <Link
                   href={siteSettings.hero_cta_link}
-                  className="motion-link group inline-flex min-h-12 items-center justify-center gap-3 bg-[#ddd7ca] px-7 py-3.5 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-900 transition-colors duration-300 hover:bg-[#c8bea9] sm:min-w-56"
+                  className="motion-link button-sheen group inline-flex min-h-12 items-center justify-center gap-3 bg-[#ddd7ca] px-7 py-3.5 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-900 transition-colors duration-300 hover:bg-[#c8bea9] sm:min-w-56"
                 >
-                  {siteSettings.hero_cta_text}
+                  <span className="button-label">
+                    <span>{siteSettings.hero_cta_text}</span>
+                    <span aria-hidden="true">{siteSettings.hero_cta_text}</span>
+                  </span>
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Link>
                 <Link
                   href="/login"
-                  className="motion-link inline-flex min-h-12 items-center justify-center border border-white/30 bg-black/10 px-7 py-3.5 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-100 hover:border-white/60 hover:bg-white/[0.08] sm:min-w-48"
+                  className="motion-link button-sheen inline-flex min-h-12 items-center justify-center border border-white/30 bg-black/10 px-7 py-3.5 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-100 hover:border-white/60 hover:bg-white/[0.08] sm:min-w-48"
                 >
-                  {t.accountSpace}
+                  <span className="button-label">
+                    <span>{t.accountSpace}</span>
+                    <span aria-hidden="true">{t.accountSpace}</span>
+                  </span>
                 </Link>
                 </div>
               </div>
@@ -274,15 +280,29 @@ function ProductCard({
     >
       <div className="relative aspect-[4/5] w-full overflow-hidden bg-[#2d2e2b]">
         {primaryImg && (
-          <Image
-            src={hovered ? secondaryImg : primaryImg}
-            alt={product.title}
-            fill
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            placeholder="blur"
-            blurDataURL={BLUR_DATA_URL}
-            className="object-cover"
-          />
+          <>
+            <Image
+              src={primaryImg}
+              alt={product.title}
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              placeholder="blur"
+              blurDataURL={BLUR_DATA_URL}
+              className={`object-cover transition-[opacity,transform] duration-700 ${hovered && secondaryImg !== primaryImg ? 'opacity-0' : 'opacity-100'}`}
+            />
+            {secondaryImg !== primaryImg && (
+              <Image
+                src={secondaryImg}
+                alt=""
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                placeholder="blur"
+                blurDataURL={BLUR_DATA_URL}
+                aria-hidden="true"
+                className={`object-cover transition-[opacity,transform] duration-700 ${hovered ? 'opacity-100' : 'opacity-0'}`}
+              />
+            )}
+          </>
         )}
         <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5 sm:left-4 sm:top-4">
           <span className="px-3 py-1 bg-[#191a19]/90 backdrop-blur-md text-[#c2b18f] text-[10px] uppercase tracking-[0.2em] rounded-full font-semibold">

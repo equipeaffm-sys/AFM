@@ -11,7 +11,7 @@ const jsonHeaders = { 'Cache-Control': 'no-store' }
 
 export async function GET() {
   return NextResponse.json(
-    { configured: Boolean(process.env.CHAT_API_KEY) },
+    { configured: Boolean(process.env.CHAT_API_KEY || process.env.GROQ_API_KEY) },
     { headers: jsonHeaders }
   )
 }
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const apiKey = process.env.CHAT_API_KEY
+  const apiKey = process.env.CHAT_API_KEY || process.env.GROQ_API_KEY
   if (!apiKey) {
     return NextResponse.json(
       { error: 'Le conseiller n’est pas configuré pour le moment.' },
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
           {
             role: 'system',
             content:
-              'Tu es le conseiller de la boutique L&M. Réponds dans la langue utilisée par le client, avec un ton chaleureux, concis et honnête. Ne prétends jamais qu’un article, une matière, une marque, une livraison, un délai, un retour ou une garantie est disponible ou confirmé si cela n’est pas indiqué dans la conversation. N’invente pas de prix ni de caractéristiques. Oriente le client vers le catalogue ou la fiche produit pour les informations exactes. Ne demande jamais de données personnelles ou de paiement.',
+              'Tu es le conseiller de la boutique L&M. Réponds dans la langue du client, de façon chaleureuse, naturelle et concise. Va directement à la réponse, sans introduction répétitive ni justification inutile. N’affirme pas de prix, disponibilité, délai, caractéristique ou condition qui ne figure pas dans la conversation. Oriente vers le catalogue ou la fiche produit si nécessaire. Ne demande jamais de données personnelles ou de paiement.',
           },
           ...messages,
         ],
