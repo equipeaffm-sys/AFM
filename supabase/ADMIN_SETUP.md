@@ -7,8 +7,17 @@ de passe ou une clé Supabase privée dans le code, le navigateur ou Git.
 
 ## Première configuration
 
-1. Dans Supabase, exécutez `schema.sql` pour une nouvelle base. Pour une base déjà installée,
-   exécutez `admin-security-hardening.sql` dans le SQL Editor.
+1. Faites une sauvegarde de la base, puis exécutez une seule fois tout le contenu de
+   `complete-setup.sql` dans Supabase **SQL Editor**. Le même script convient à une nouvelle
+   base ou à une base existante utilisant déjà le schéma L&M actuel. Il ne supprime pas les
+   commandes, produits, catégories ou rôles existants et ne crée aucun produit de démonstration.
+   Il crée aussi le bucket public `product-images` avec ajout/suppression réservés aux rôles
+   `editor` et `super_admin`. Si la base utilise les anciens rôles `client/admin/vip` ou une
+   structure différente, le script s’arrête sans changement : fais d’abord une migration
+   dédiée au lieu de supprimer ou recréer tes tables.
+   Le script ne configure pas les options d’authentification du tableau de bord Supabase :
+   activez l’inscription par e-mail et ajoutez les URL locales/de production dans
+   **Authentication → URL Configuration**.
 2. Créez votre propre utilisateur avec une adresse e-mail que vous contrôlez, via l’inscription
    du site ou Supabase **Authentication → Users**. Confirmez l’adresse e-mail.
 3. Dans Supabase **SQL Editor**, vérifiez que le compte possède bien un profil client :

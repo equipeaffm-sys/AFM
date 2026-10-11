@@ -29,10 +29,14 @@ pas définies. Avant de l’activer, renseignez également les vraies clés Stri
 
 L’administration n’est pas exposée dans la navigation publique. Son accès est contrôlé par
 Supabase Auth, les rôles en base et les politiques RLS ; son URL n’est pas considérée comme un
-secret. Pour créer votre propre compte administrateur sans identifiants codés en dur, suivez
-[`supabase/ADMIN_SETUP.md`](./supabase/ADMIN_SETUP.md). Pour une base déjà installée, exécutez
-[`supabase/admin-security-hardening.sql`](./supabase/admin-security-hardening.sql) dans le SQL
-Editor Supabase. N’ajoutez jamais de mot de passe ou de clé privée au code ou au dépôt.
+secret. Le script [`supabase/complete-setup.sql`](./supabase/complete-setup.sql) configure le
+schéma de la boutique, les rôles/RLS et le bucket public `product-images` (lecture publique,
+écriture réservée au personnel). Il peut être rejoué sur une nouvelle base ou une base déjà au
+schéma L&M actuel et ne crée aucun faux produit. Il s’arrête sans changement si les anciens types
+SQL incompatibles sont détectés. Sauvegardez une base existante avant la migration. Pour attribuer
+le rôle administrateur à votre propre compte après inscription et confirmation de l’adresse,
+suivez [`supabase/ADMIN_SETUP.md`](./supabase/ADMIN_SETUP.md). N’ajoutez jamais de mot de passe,
+de clé S3 ou de clé Supabase privée au code ou au dépôt.
 
 ## Conseiller de la boutique
 
