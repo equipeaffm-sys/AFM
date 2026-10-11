@@ -37,6 +37,9 @@ SQL incompatibles sont détectés. Sauvegardez une base existante avant la migra
 le rôle administrateur à votre propre compte après inscription et confirmation de l’adresse,
 suivez [`supabase/ADMIN_SETUP.md`](./supabase/ADMIN_SETUP.md). N’ajoutez jamais de mot de passe,
 de clé S3 ou de clé Supabase privée au code ou au dépôt.
+Si le SQL Editor ne permet pas de modifier `storage.objects`, le script affiche un avertissement
+et applique le reste de la configuration. Terminez alors les politiques Storage depuis le
+tableau de bord en suivant le guide d’administration.
 
 ## Conseiller de la boutique
 

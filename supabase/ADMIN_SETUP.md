@@ -18,6 +18,18 @@ de passe ou une clé Supabase privée dans le code, le navigateur ou Git.
    Le script ne configure pas les options d’authentification du tableau de bord Supabase :
    activez l’inscription par e-mail et ajoutez les URL locales/de production dans
    **Authentication → URL Configuration**.
+   Si le résultat SQL affiche l’avertissement `Storage policies were not changed`, Supabase
+   n’autorise pas le rôle SQL à modifier sa table gérée `storage.objects`. Le reste du script
+   est quand même appliqué. Dans ce cas, ouvrez **Storage → Policies** et créez sur
+   `product-images` les trois politiques suivantes pour le rôle `authenticated` :
+
+   - **INSERT** — autoriser si `bucket_id = 'product-images' AND public.is_editor_or_above()`.
+   - **UPDATE** — conditions USING et WITH CHECK : `bucket_id = 'product-images' AND public.is_editor_or_above()`.
+   - **DELETE** — autoriser si `bucket_id = 'product-images' AND public.is_editor_or_above()`.
+
+   Le bucket est public pour servir les images : n’ajoutez jamais de règle d’upload publique.
+   Supabase gère déjà RLS et la propriété de sa table Storage; le script ne tente pas de les
+   modifier.
 2. Créez votre propre utilisateur avec une adresse e-mail que vous contrôlez, via l’inscription
    du site ou Supabase **Authentication → Users**. Confirmez l’adresse e-mail.
 3. Dans Supabase **SQL Editor**, vérifiez que le compte possède bien un profil client :

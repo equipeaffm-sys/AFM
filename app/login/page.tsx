@@ -68,7 +68,12 @@ function LoginForm() {
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(err.message)
+        const message = err.message.toLowerCase()
+        setError(
+          message.includes('failed to fetch') || message.includes('networkerror')
+            ? 'Connexion à Supabase impossible. Vérifiez sur Vercel NEXT_PUBLIC_SUPABASE_URL et NEXT_PUBLIC_SUPABASE_ANON_KEY, puis redéployez. En local, vérifiez .env.local et redémarrez le serveur.'
+            : err.message
+        )
       } else {
         setError('Une erreur est survenue lors de l\'authentification.')
       }

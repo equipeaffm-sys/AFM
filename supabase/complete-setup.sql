@@ -521,23 +521,33 @@ ON CONFLICT (id) DO UPDATE SET
   file_size_limit = EXCLUDED.file_size_limit,
   allowed_mime_types = EXCLUDED.allowed_mime_types;
 
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public can view product images" ON storage.objects;
-DROP POLICY IF EXISTS "Staff can upload product images" ON storage.objects;
-DROP POLICY IF EXISTS "Staff can update product images" ON storage.objects;
-DROP POLICY IF EXISTS "Staff can delete product images" ON storage.objects;
-CREATE POLICY "Public can view product images" ON storage.objects
-  FOR SELECT USING (bucket_id = 'product-images');
-CREATE POLICY "Staff can upload product images" ON storage.objects
-  FOR INSERT TO authenticated
-  WITH CHECK (bucket_id = 'product-images' AND public.is_editor_or_above());
-CREATE POLICY "Staff can update product images" ON storage.objects
-  FOR UPDATE TO authenticated
-  USING (bucket_id = 'product-images' AND public.is_editor_or_above())
-  WITH CHECK (bucket_id = 'product-images' AND public.is_editor_or_above());
-CREATE POLICY "Staff can delete product images" ON storage.objects
-  FOR DELETE TO authenticated
-  USING (bucket_id = 'product-images' AND public.is_editor_or_above());
+-- Supabase manages ownership and RLS on storage.objects. Try to install the
+-- object policies, but do not abort all public-schema setup if this SQL Editor
+-- role is not allowed to manage the Storage-owned table. In that case, add the
+-- same policies from Dashboard > Storage > Policies (instructions in ADMIN_SETUP.md).
+DO $storage_policies$
+BEGIN
+  EXECUTE 'DROP POLICY IF EXISTS "Public can view product images" ON storage.objects';
+  EXECUTE 'DROP POLICY IF EXISTS "Staff can upload product images" ON storage.objects';
+  EXECUTE 'DROP POLICY IF EXISTS "Staff can update product images" ON storage.objects';
+  EXECUTE 'DROP POLICY IF EXISTS "Staff can delete product images" ON storage.objects';
+  EXECUTE 'CREATE POLICY "Public can view product images" ON storage.objects
+    FOR SELECT USING (bucket_id = ''product-images'')';
+  EXECUTE 'CREATE POLICY "Staff can upload product images" ON storage.objects
+    FOR INSERT TO authenticated
+    WITH CHECK (bucket_id = ''product-images'' AND public.is_editor_or_above())';
+  EXECUTE 'CREATE POLICY "Staff can update product images" ON storage.objects
+    FOR UPDATE TO authenticated
+    USING (bucket_id = ''product-images'' AND public.is_editor_or_above())
+    WITH CHECK (bucket_id = ''product-images'' AND public.is_editor_or_above())';
+  EXECUTE 'CREATE POLICY "Staff can delete product images" ON storage.objects
+    FOR DELETE TO authenticated
+    USING (bucket_id = ''product-images'' AND public.is_editor_or_above())';
+EXCEPTION
+  WHEN insufficient_privilege THEN
+    RAISE WARNING 'Storage policies were not changed because this SQL Editor role does not own storage.objects. Finish the Storage > Policies steps in supabase/ADMIN_SETUP.md.';
+END
+$storage_policies$;
 
 COMMIT;
 
