@@ -1,0 +1,126 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #191a19;
+  --foreground: #e6e3dc;
+  --accent: #b6a17d;
+  --accent-soft: #34312b;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  color: inherit;
+}
+
+.motion-rise {
+  animation: motion-rise 650ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.hero-image-drift {
+  animation: hero-image-drift 18s ease-out both;
+}
+
+.motion-card {
+  animation: motion-rise 550ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  transition:
+    transform 350ms cubic-bezier(0.2, 0.75, 0.25, 1),
+    box-shadow 350ms ease,
+    border-color 250ms ease;
+}
+
+.motion-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 18px 42px -22px rgba(50, 38, 22, 0.38);
+}
+
+.motion-card img {
+  transition: transform 700ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.motion-card:hover img {
+  transform: scale(1.045);
+}
+
+.motion-link {
+  transition:
+    color 200ms ease,
+    background-color 250ms ease,
+    border-color 250ms ease,
+    transform 250ms cubic-bezier(0.2, 0.75, 0.25, 1),
+    box-shadow 250ms ease;
+}
+
+.motion-link:hover {
+  transform: translateY(-1px);
+}
+
+@keyframes motion-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-image-drift {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+
+.glass-panel {
+  background: rgba(35, 36, 34, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(182, 161, 125, 0.2);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #191a19;
+}
+::-webkit-scrollbar-thumb {
+  background: #716753;
+  border: 2px solid #191a19;
+  border-radius: 999px;
+}
+
+::selection {
+  background-color: #6c604a;
+  color: #f5f2eb;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
