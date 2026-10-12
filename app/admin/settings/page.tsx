@@ -45,7 +45,7 @@ export default function AdminSettingsPage() {
             <div>
               <h2 className="font-serif text-xl font-semibold text-zinc-950">Conseiller automatique</h2>
               <p className="mt-1 max-w-xl text-sm leading-relaxed text-zinc-600">
-                Le conseiller Groq répond aux questions et aide à naviguer dans la boutique.
+                Le conseiller Grok répond aux questions et aide à naviguer dans la boutique.
               </p>
             </div>
           </div>
@@ -70,15 +70,15 @@ export default function AdminSettingsPage() {
           <div className="flex items-start gap-3">
             <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-[#806238]" aria-hidden="true" />
             <div className="space-y-2 text-sm leading-relaxed text-zinc-700">
-              <p className="font-medium text-zinc-900">Configurer Groq</p>
+              <p className="font-medium text-zinc-900">Configurer xAI Grok</p>
               <p>
-                Ajoutez votre clé Groq à la variable serveur <code className="rounded bg-white px-1.5 py-0.5 font-mono text-xs">CHAT_API_KEY</code>, puis redémarrez le serveur.
+                Créez une clé API dans la console xAI et ajoutez-la à la variable serveur <code className="rounded bg-white px-1.5 py-0.5 font-mono text-xs">XAI_API_KEY</code>, puis redéployez le site.
               </p>
-              <pre className="overflow-x-auto rounded-lg border border-[#e4ded3] bg-white p-3 text-xs leading-relaxed text-zinc-700"><code>{`CHAT_API_KEY=votre-cle-privee
-CHAT_API_URL=https://api.groq.com/openai/v1/chat/completions
-CHAT_MODEL=llama-3.3-70b-versatile`}</code></pre>
+              <pre className="overflow-x-auto rounded-lg border border-[#e4ded3] bg-white p-3 text-xs leading-relaxed text-zinc-700"><code>{`XAI_API_KEY=votre-cle-privee
+CHAT_API_URL=https://api.x.ai/v1/chat/completions
+CHAT_MODEL=grok-4.7`}</code></pre>
               <p className="text-xs text-zinc-500">
-                Ne mettez jamais une clé dans un composant, dans une variable <code className="font-mono">NEXT_PUBLIC_</code> ou dans un dépôt partagé. La clé reste côté serveur et ne peut pas être modifiée depuis le navigateur.
+                Obtenez la clé sur console.x.ai. Ne mettez jamais une clé dans un composant, dans une variable <code className="font-mono">NEXT_PUBLIC_</code> ou dans un dépôt partagé. La clé reste côté serveur et ne peut pas être modifiée depuis le navigateur.
               </p>
             </div>
           </div>

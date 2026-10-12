@@ -11,7 +11,7 @@ const jsonHeaders = { 'Cache-Control': 'no-store' }
 
 export async function GET() {
   return NextResponse.json(
-    { configured: Boolean(process.env.CHAT_API_KEY || process.env.GROQ_API_KEY) },
+    { configured: Boolean(process.env.XAI_API_KEY || process.env.CHAT_API_KEY) },
     { headers: jsonHeaders }
   )
 }
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const apiKey = process.env.CHAT_API_KEY || process.env.GROQ_API_KEY
+  const apiKey = process.env.XAI_API_KEY || process.env.CHAT_API_KEY
   if (!apiKey) {
     return NextResponse.json(
       { error: 'Le conseiller n’est pas configuré pour le moment.' },
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
   }
 
   const endpoint =
-    process.env.CHAT_API_URL || 'https://api.groq.com/openai/v1/chat/completions'
+    process.env.CHAT_API_URL || 'https://api.x.ai/v1/chat/completions'
   let endpointUrl: URL
   try {
     endpointUrl = new URL(endpoint)
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: process.env.CHAT_MODEL || 'llama-3.3-70b-versatile',
+        model: process.env.CHAT_MODEL || 'grok-4.7',
         messages: [
           {
             role: 'system',

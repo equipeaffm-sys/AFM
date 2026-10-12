@@ -45,11 +45,13 @@ tableau de bord en suivant le guide d’administration.
 
 Le widget fournit des réponses locales aux questions fréquentes (catalogue, compte,
 commandes, livraison et retours) et fonctionne sans clé ni service externe. Pour activer les
-réponses IA avec Groq, définissez `CHAT_API_KEY` (ou `GROQ_API_KEY`) dans `.env.local`. L’endpoint Groq compatible
-OpenAI et le modèle `llama-3.3-70b-versatile` sont utilisés par défaut; vous pouvez les
-remplacer avec `CHAT_API_URL` et `CHAT_MODEL` si nécessaire. Un exemple est disponible dans
-`.env.local.example`. Redémarrez le serveur après modification. La clé est lue uniquement
-côté serveur : ne la préfixez pas par `NEXT_PUBLIC_` et ne la commitez pas.
+réponses IA avec xAI, définissez `XAI_API_KEY` dans `.env.local` ou dans les variables du
+serveur. L’endpoint compatible OpenAI `https://api.x.ai/v1/chat/completions` et le modèle
+`grok-4.7` sont utilisés par défaut; vous pouvez les remplacer avec `CHAT_API_URL` et
+`CHAT_MODEL` si nécessaire. Une ancienne variable `CHAT_API_KEY` reste prise en charge si
+`XAI_API_KEY` n’est pas définie. Un exemple est disponible dans `.env.local.example`.
+Redémarrez le serveur après modification. La clé est lue uniquement côté serveur : ne la
+préfixez pas par `NEXT_PUBLIC_` et ne la commitez pas.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
