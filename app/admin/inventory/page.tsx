@@ -4,16 +4,18 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { ArrowLeft, RefreshCw, PackageCheck, Download } from 'lucide-react'
+import { ArrowLeft, RefreshCw, PackageCheck, Download, Filter } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Product } from '@/lib/constants'
 
 export default function InventoryPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false)
   const lowStockProducts = products.filter(
     (product) => product.stock <= (product.low_stock_threshold ?? 3)
   )
+  const displayedProducts = showLowStockOnly ? lowStockProducts : products
 
   const loadProducts = async () => {
     setLoading(true)
@@ -141,19 +143,36 @@ export default function InventoryPage() {
 
         {/* Healthy Inventory Table */}
         <div className="bg-white border border-zinc-200/80 rounded-2xl overflow-hidden shadow-sm">
-          <div className="p-6 border-b border-zinc-100 font-serif font-bold text-base text-zinc-950 flex items-center justify-between">
+          <div className="flex flex-col gap-3 border-b border-zinc-100 p-6 font-serif text-base font-bold text-zinc-950 sm:flex-row sm:items-center sm:justify-between">
             <span className="flex items-center gap-2">
               <PackageCheck className="w-5 h-5 text-emerald-600" />
-              Inventaire Global du Catalogue ({products.length} articles)
+              {showLowStockOnly ? 'À réapprovisionner' : 'Inventaire Global du Catalogue'} ({displayedProducts.length})
             </span>
+            <button
+              type="button"
+              aria-pressed={showLowStockOnly}
+              onClick={() => setShowLowStockOnly((current) => !current)}
+              className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                showLowStockOnly
+                  ? 'border-amber-400 bg-amber-50 text-amber-900'
+                  : 'border-zinc-300 bg-white text-zinc-700 hover:border-[#C5A059]'
+              }`}
+            >
+              <Filter className="h-4 w-4" aria-hidden="true" />
+              {showLowStockOnly ? 'Voir tout l’inventaire' : `Stocks faibles (${lowStockProducts.length})`}
+            </button>
           </div>
 
           {loading ? (
             <div className="p-12 text-center text-zinc-500 font-serif text-sm">
               Chargement des stocks...
             </div>
-          ) : products.length === 0 ? (
-            <div className="p-8 text-center text-zinc-500 text-xs">Aucun produit disponible.</div>
+          ) : displayedProducts.length === 0 ? (
+            <div className="p-8 text-center text-zinc-500 text-xs">
+              {showLowStockOnly
+                ? 'Aucun produit ne nécessite de réapprovisionnement.'
+                : 'Aucun produit disponible.'}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -166,7 +185,7 @@ export default function InventoryPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                  {products.map((p) => (
+                  {displayedProducts.map((p) => (
                     <tr key={p.id} className="hover:bg-zinc-50 transition-colors">
                       <td className="py-4 px-6 flex items-center gap-3">
                         <div className="relative w-10 h-10 bg-zinc-100 rounded-lg overflow-hidden shrink-0 border border-zinc-200">

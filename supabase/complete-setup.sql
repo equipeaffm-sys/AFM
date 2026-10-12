@@ -306,9 +306,39 @@ CREATE TABLE IF NOT EXISTS public.currencies (
 CREATE TABLE IF NOT EXISTS public.tax_rates (
   country_code TEXT PRIMARY KEY,
   country_name TEXT NOT NULL,
-  rate_percent NUMERIC(5,2) NOT NULL DEFAULT 20.0,
+  rate_percent NUMERIC(5,2),
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Tax rules are decided per country by an administrator. There is deliberately
+-- no default rate: a NULL rate_percent means the tax treatment for that country
+-- is not decided yet, and checkout refuses to serve such a country.
+ALTER TABLE public.tax_rates
+  ALTER COLUMN rate_percent DROP DEFAULT;
+ALTER TABLE public.tax_rates
+  ALTER COLUMN rate_percent DROP NOT NULL;
+ALTER TABLE public.tax_rates
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+-- Shipping zones group served countries (France / Europe outside France /
+-- International). No zone is seeded: each starts inactive and unconfigured, and
+-- the owner fills real carrier names, Stripe rate ids and country lists from the
+-- admin UI. Checkout stays disabled until every active zone has a valid rule.
+CREATE TABLE IF NOT EXISTS public.shipping_zones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  zone_key TEXT NOT NULL UNIQUE
+    CHECK (zone_key IN ('france', 'europe', 'international')),
+  label TEXT NOT NULL,
+  countries TEXT[] NOT NULL DEFAULT '{}',
+  carrier_name TEXT,
+  fee_cents INTEGER CHECK (fee_cents IS NULL OR fee_cents >= 0),
+  free_threshold_cents INTEGER CHECK (free_threshold_cents IS NULL OR free_threshold_cents >= 0),
+  stripe_shipping_rate_id TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT false,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.site_settings (
@@ -323,9 +353,13 @@ CREATE TABLE IF NOT EXISTS public.orders (
   status public.order_status NOT NULL DEFAULT 'pending',
   total_cents INTEGER NOT NULL CHECK (total_cents >= 0),
   shipping_address JSONB,
+  stripe_session_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS stripe_session_id TEXT;
 
 CREATE TABLE IF NOT EXISTS public.order_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -345,10 +379,154 @@ CREATE INDEX IF NOT EXISTS product_variants_product_id_idx
   ON public.product_variants (product_id);
 CREATE INDEX IF NOT EXISTS orders_user_id_created_at_idx
   ON public.orders (user_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS orders_stripe_session_id_idx
+  ON public.orders (stripe_session_id)
+  WHERE stripe_session_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS order_items_order_id_idx
   ON public.order_items (order_id);
 CREATE INDEX IF NOT EXISTS audit_logs_created_at_idx
   ON public.audit_logs (created_at DESC);
+
+CREATE OR REPLACE FUNCTION public.create_pending_checkout_order(
+  p_user_id UUID,
+  p_items JSONB
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  created_order_id UUID;
+  requested_item RECORD;
+  product_record public.products%ROWTYPE;
+  item_price_cents INTEGER;
+  order_total_cents BIGINT := 0;
+BEGIN
+  IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' THEN
+    RAISE EXCEPTION 'The checkout cart must be a JSON array.';
+  END IF;
+  IF jsonb_array_length(p_items) < 1 OR jsonb_array_length(p_items) > 50 THEN
+    RAISE EXCEPTION 'The checkout cart is empty or too large.';
+  END IF;
+
+  INSERT INTO public.orders (user_id, status, total_cents)
+  VALUES (p_user_id, 'pending', 0)
+  RETURNING id INTO created_order_id;
+
+  FOR requested_item IN
+    SELECT item.product_id, SUM(item.quantity)::INTEGER AS quantity
+    FROM jsonb_to_recordset(p_items) AS item(product_id UUID, quantity INTEGER)
+    GROUP BY item.product_id
+  LOOP
+    IF requested_item.product_id IS NULL
+      OR requested_item.quantity < 1
+      OR requested_item.quantity > 99
+    THEN
+      RAISE EXCEPTION 'A checkout item is invalid.';
+    END IF;
+
+    SELECT *
+      INTO product_record
+      FROM public.products
+      WHERE id = requested_item.product_id
+        AND is_active = TRUE
+      FOR UPDATE;
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'A product is no longer available.';
+    END IF;
+    IF product_record.stock < requested_item.quantity THEN
+      RAISE EXCEPTION 'A product does not have enough stock.';
+    END IF;
+
+    item_price_cents := CASE
+      WHEN product_record.sale_price_cents IS NOT NULL
+        AND (
+          product_record.sale_ends_at IS NULL
+          OR product_record.sale_ends_at > NOW()
+        )
+      THEN product_record.sale_price_cents
+      ELSE product_record.price_cents
+    END;
+    IF item_price_cents <= 0 THEN
+      RAISE EXCEPTION 'Products must have a positive price to use online checkout.';
+    END IF;
+
+    order_total_cents := order_total_cents
+      + (item_price_cents::BIGINT * requested_item.quantity);
+
+    IF order_total_cents > 2147483647 THEN
+      RAISE EXCEPTION 'The checkout total exceeds the supported limit.';
+    END IF;
+
+    UPDATE public.products
+      SET stock = stock - requested_item.quantity,
+          updated_at = NOW()
+      WHERE id = requested_item.product_id;
+
+    INSERT INTO public.order_items (order_id, product_id, quantity, unit_price_cents)
+    VALUES (
+      created_order_id,
+      requested_item.product_id,
+      requested_item.quantity,
+      item_price_cents
+    );
+  END LOOP;
+
+  UPDATE public.orders
+    SET total_cents = order_total_cents::INTEGER,
+        updated_at = NOW()
+    WHERE id = created_order_id;
+
+  RETURN created_order_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.release_pending_checkout_order(p_order_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  released_order_id UUID;
+  ordered_item RECORD;
+BEGIN
+  UPDATE public.orders
+    SET status = 'cancelled',
+        updated_at = NOW()
+    WHERE id = p_order_id
+      AND status = 'pending'
+    RETURNING id INTO released_order_id;
+
+  IF released_order_id IS NULL THEN
+    RETURN FALSE;
+  END IF;
+
+  FOR ordered_item IN
+    SELECT product_id, quantity
+    FROM public.order_items
+    WHERE order_id = p_order_id
+  LOOP
+    UPDATE public.products
+      SET stock = stock + ordered_item.quantity,
+          updated_at = NOW()
+      WHERE id = ordered_item.product_id;
+  END LOOP;
+
+  RETURN TRUE;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.create_pending_checkout_order(UUID, JSONB)
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.release_pending_checkout_order(UUID)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.create_pending_checkout_order(UUID, JSONB)
+  TO service_role;
+GRANT EXECUTE ON FUNCTION public.release_pending_checkout_order(UUID)
+  TO service_role;
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
@@ -360,6 +538,7 @@ ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_variants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.currencies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tax_rates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.shipping_zones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
@@ -451,6 +630,13 @@ CREATE POLICY "Public read tax rates" ON public.tax_rates
 CREATE POLICY "SuperAdmin full access tax rates" ON public.tax_rates
   FOR ALL USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
 
+DROP POLICY IF EXISTS "Public read shipping zones" ON public.shipping_zones;
+DROP POLICY IF EXISTS "SuperAdmin full access shipping zones" ON public.shipping_zones;
+CREATE POLICY "Public read shipping zones" ON public.shipping_zones
+  FOR SELECT USING (true);
+CREATE POLICY "SuperAdmin full access shipping zones" ON public.shipping_zones
+  FOR ALL USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
+
 DROP POLICY IF EXISTS "Public read site settings" ON public.site_settings;
 DROP POLICY IF EXISTS "Admins manage site settings" ON public.site_settings;
 DROP POLICY IF EXISTS "SuperAdmin full access site settings" ON public.site_settings;
@@ -484,7 +670,8 @@ CREATE POLICY "Users view own order items or admin" ON public.order_items
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT SELECT ON public.categories, public.attributes, public.attribute_values,
-  public.currencies, public.tax_rates, public.site_settings TO anon, authenticated;
+  public.currencies, public.tax_rates, public.site_settings,
+  public.shipping_zones TO anon, authenticated;
 GRANT SELECT ON public.suppliers TO anon, authenticated;
 GRANT SELECT ON public.products, public.product_variants TO anon, authenticated;
 GRANT INSERT, UPDATE, DELETE ON public.categories, public.attributes,
@@ -497,7 +684,8 @@ GRANT SELECT ON public.profiles, public.orders, public.order_items TO authentica
 GRANT UPDATE (full_name, updated_at, role) ON public.profiles TO authenticated;
 GRANT UPDATE ON public.orders TO authenticated;
 GRANT SELECT, INSERT ON public.audit_logs TO authenticated;
-GRANT INSERT, UPDATE, DELETE ON public.site_settings, public.currencies, public.tax_rates
+GRANT INSERT, UPDATE, DELETE ON public.site_settings, public.currencies, public.tax_rates,
+  public.shipping_zones
   TO authenticated;
 
 GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
@@ -561,8 +749,8 @@ COMMIT;
 --   AND lower(users.email) = lower('YOUR_OWN_EMAIL')
 -- RETURNING profiles.id, profiles.email, profiles.role;
 --
--- No customer order INSERT policy is enabled. The checkout endpoint is disabled;
--- create orders later through a trusted server-side flow, never from browser-supplied totals.
+-- No customer order INSERT policy is enabled. The prepared checkout creates orders through
+-- trusted server-side functions and never accepts browser-supplied totals.
 
 -- Optional read-only checks after the setup has completed:
 -- SELECT tablename, rowsecurity

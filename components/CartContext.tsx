@@ -63,6 +63,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addItem = (item: Omit<CartItem, 'quantity'> & { quantity?: number }) => {
     const qtyToAdd = item.quantity || 1
+    const previousQuantity = cart.find((cartItem) => cartItem.id === item.id)?.quantity || 0
     setCart((prev) => {
       const existingIndex = prev.findIndex((i) => i.id === item.id)
       if (existingIndex > -1) {
@@ -76,9 +77,42 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return [...prev, { ...item, quantity: qtyToAdd }]
       }
     })
-    toast.success(`"${item.title}" ajouté à votre sélection.`, {
-      icon: '✨',
-    })
+    toast.custom(
+      (toastInstance) => (
+        <div
+          role="status"
+          className="flex items-center gap-4 rounded-xl border border-[#8f8065]/40 bg-[#20211f] px-4 py-3 text-sm text-zinc-100 shadow-xl"
+        >
+          <span>{`"${item.title}" ajouté au panier.`}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setCart((currentCart) => {
+                const currentItem = currentCart.find((cartItem) => cartItem.id === item.id)
+                if (!currentItem || currentItem.quantity <= previousQuantity) return currentCart
+
+                const nextQuantity = Math.max(previousQuantity, currentItem.quantity - qtyToAdd)
+                return nextQuantity === 0
+                  ? currentCart.filter((cartItem) => cartItem.id !== item.id)
+                  : currentCart.map((cartItem) =>
+                      cartItem.id === item.id
+                        ? { ...cartItem, quantity: nextQuantity }
+                        : cartItem
+                    )
+              })
+              toast.dismiss(toastInstance.id)
+            }}
+            className="shrink-0 font-semibold text-[#d6c8aa] underline underline-offset-2 hover:text-white"
+          >
+            Annuler
+          </button>
+        </div>
+      ),
+      {
+        duration: 3000,
+        position: 'bottom-right',
+      }
+    )
     setIsCartOpen(true)
   }
 

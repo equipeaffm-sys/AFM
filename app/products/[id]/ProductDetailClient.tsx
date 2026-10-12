@@ -12,7 +12,9 @@ import {
   Check,
   Layers,
   AlertTriangle,
+  Share2,
 } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { useCart } from '@/components/CartContext'
 import { useCurrency } from '@/components/CurrencyContext'
 import { useLanguage } from '@/components/LanguageContext'
@@ -46,6 +48,8 @@ export default function ProductDetailClient({ productId }: { productId: string }
   const [showStickyBar, setShowStickyBar] = useState(false)
 
   const primaryBuyButtonRef = useRef<HTMLButtonElement | null>(null)
+  const touchStartXRef = useRef<number | null>(null)
+  const skipNextGalleryClickRef = useRef(false)
 
   const { addItem, openCart } = useCart()
   const { markViewed } = useSavedProducts()
@@ -121,6 +125,30 @@ export default function ProductDetailClient({ productId }: { productId: string }
     setTimeout(() => {
       setAddedToCart(false)
     }, 1000)
+  }
+
+  const shareProduct = async () => {
+    const shareData = {
+      title: product?.title || 'Maison L&M',
+      text: product?.description || 'Découvrez ce produit Maison L&M.',
+      url: window.location.href,
+    }
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData)
+        return
+      }
+      if (!navigator.clipboard) {
+        throw new Error('Le partage et la copie ne sont pas disponibles dans ce navigateur.')
+      }
+      await navigator.clipboard.writeText(shareData.url)
+      toast.success('Lien du produit copié.')
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      console.error('Unable to share the product link:', error)
+      toast.error('Impossible de partager ce produit pour le moment.')
+    }
   }
 
   if (loading) {
@@ -220,7 +248,32 @@ export default function ProductDetailClient({ productId }: { productId: string }
                 setHoverZoom(true)
               }}
               onPointerLeave={() => setHoverZoom(false)}
+              onPointerDown={(event) => {
+                touchStartXRef.current = event.pointerType === 'touch' ? event.clientX : null
+              }}
+              onPointerUp={(event) => {
+                const startX = touchStartXRef.current
+                touchStartXRef.current = null
+                if (
+                  startX === null ||
+                  Math.abs(event.clientX - startX) < 45 ||
+                  galleryImages.length < 2 ||
+                  isZoomed
+                ) {
+                  return
+                }
+                skipNextGalleryClickRef.current = true
+                setSelectedImageIndex((currentIndex) => (
+                  event.clientX < startX
+                    ? (currentIndex + 1) % galleryImages.length
+                    : (currentIndex - 1 + galleryImages.length) % galleryImages.length
+                ))
+              }}
               onClick={() => {
+                if (skipNextGalleryClickRef.current) {
+                  skipNextGalleryClickRef.current = false
+                  return
+                }
                 if (window.matchMedia('(hover: none)').matches) {
                   setIsZoomed((zoomed) => !zoomed)
                 }
@@ -257,6 +310,8 @@ export default function ProductDetailClient({ productId }: { productId: string }
                   <button
                     key={idx}
                     onClick={() => setSelectedImageIndex(idx)}
+                    aria-label={`Afficher l’image ${idx + 1} sur ${galleryImages.length}`}
+                    aria-current={selectedImageIndex === idx ? 'true' : undefined}
                     className={`h-2 rounded-full transition-all ${
                       selectedImageIndex === idx ? 'w-6 bg-[#b6a17d]' : 'w-2 bg-zinc-600'
                     }`}
@@ -302,6 +357,14 @@ export default function ProductDetailClient({ productId }: { productId: string }
               <h1 className="fluid-heading letterspace-hover font-serif font-medium text-zinc-100 leading-tight">
               {product.title}
               </h1>
+              <button
+                type="button"
+                onClick={shareProduct}
+                className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/[0.12] px-3 py-2 text-xs font-semibold text-zinc-300 transition-colors hover:border-[#8f8065] hover:text-[#d6c8aa]"
+              >
+                <Share2 className="h-4 w-4" aria-hidden="true" />
+                Partager le produit
+              </button>
 
               {/* Price & Sale Pricing Display */}
               <div className="pt-2 flex items-baseline gap-3">

@@ -1,13 +1,19 @@
 import Link from 'next/link'
+import CancelOrderRelease from './CancelOrderRelease'
 
-export default function CancelPage() {
+interface CancelPageProps {
+  searchParams: { order_id?: string }
+}
+
+export default function CancelPage({ searchParams }: CancelPageProps) {
   return (
     <main className="flex min-h-[80vh] items-center justify-center bg-zinc-950 px-4 py-16">
       <section className="w-full max-w-xl space-y-6 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-8 text-center text-zinc-100 sm:p-12">
-        <h1 className="font-serif text-3xl font-bold">Commandes temporairement indisponibles</h1>
+        <CancelOrderRelease orderId={searchParams.order_id} />
+        <h1 className="font-serif text-3xl font-bold">Paiement annulé</h1>
         <p className="text-sm text-zinc-400">
-          Les commandes ne sont pas ouvertes tant que les conditions de livraison ne sont pas
-          configurées.
+          Aucun paiement n’a été confirmé. Vous pouvez retrouver votre panier et réessayer plus
+          tard.
         </p>
         <Link
           href="/products"

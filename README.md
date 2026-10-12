@@ -21,9 +21,11 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 ## Catalogue et commandes
 
 Le catalogue affiche uniquement les produits enregistrés dans Supabase. La validation des
-commandes est temporairement désactivée tant que les conditions réelles de livraison ne sont
-pas définies. Avant de l’activer, renseignez également les vraies clés Stripe et Resend dans
-`.env.local` et implémentez les conditions de commande applicables.
+commandes est préparée avec Stripe Checkout hébergé, mais reste désactivée par défaut.
+Consultez la section **Paiements Stripe** avant toute activation. Les prix et stocks sont
+relus côté serveur; les valeurs du panier dans le navigateur ne sont jamais utilisées pour
+facturer. Le checkout utilise les moyens de paiement dynamiques configurés dans Stripe, et
+requiert des tarifs de livraison réels.
 
 ## Administration
 
@@ -71,9 +73,54 @@ de passe après l’avoir ouvert.
 Le webhook Stripe envoie aussi un e-mail de confirmation de paiement avec Resend lorsque
 `RESEND_API_KEY` et `RESEND_FROM_EMAIL` sont configurées côté serveur. Ajoutez ces deux
 variables dans Vercel avec une clé API Resend et une adresse expéditeur vérifiée. Le paiement
-de la boutique reste actuellement désactivé tant que les conditions de livraison ne sont pas
-configurées; l’e-mail de commande ne sera donc envoyé qu’après activation d’un flux de paiement
-réel. N’utilisez jamais `NEXT_PUBLIC_` pour une clé Resend.
+reste désactivé tant que `PAYMENTS_ENABLED` n’est pas explicitement défini sur `true`.
+N’utilisez jamais `NEXT_PUBLIC_` pour une clé Resend.
+
+## Paiements Stripe
+
+Le site utilise Stripe Checkout hébergé. Le paramètre `payment_method_types` n’est volontairement
+pas fixé dans le code : Stripe sélectionne les moyens de paiement dynamiques autorisés dans le
+Dashboard, selon le pays, la devise et l’éligibilité du client. Activez-y les méthodes voulues;
+Apple Pay et Google Pay apparaissent uniquement lorsque le compte, le navigateur et le domaine
+sont éligibles. Il n’est pas possible de garantir que tous les moyens existent pour chaque pays.
+
+Avant de l’ouvrir :
+
+1. **Zones de livraison (administrables).** Le checkout n’utilise plus un tarif unique. Créez d’abord
+   dans Stripe un tarif d’expédition (`shr_...`) **par zone** que vous comptez desservir, puis, dans
+   l’administration (`/admin/shipping`), renseignez chaque zone (France, Europe hors France,
+   International) : la liste des pays (codes ISO à deux lettres), le transporteur, les frais, le seuil
+   de livraison gratuite et l’identifiant de tarif Stripe `shr_...` correspondant. Aucune valeur n’est
+   préremplie : une zone mal renseignée n’ouvre pas le paiement.
+2. Dans **Stripe → Paramètres → Moyens de paiement**, activez ceux que vous souhaitez proposer.
+   Configurez et vérifiez aussi le domaine pour les wallets si Stripe le demande.
+3. Dans `.env.local` ou Vercel, configurez `STRIPE_SECRET_KEY` et `STRIPE_WEBHOOK_SECRET`. Les pays
+   autorisés et les tarifs de livraison ne sont **plus** des variables d’environnement : ils proviennent
+   des tables Supabase `shipping_zones` et `tax_rates` éditées dans l’administration. Les anciennes
+   variables `STRIPE_ALLOWED_COUNTRIES` et `STRIPE_SHIPPING_RATE_ID` ne sont plus utilisées.
+   Checkout hébergé ne nécessite pas de clé publique Stripe dans le navigateur.
+   Utilisez `sk_test_...` et le secret du webhook de test pour les tests; configurez des secrets
+   distincts pour la production.
+4. Créez un endpoint webhook Stripe vers
+   `https://VOTRE-DOMAINE/api/webhooks/stripe` pour les événements
+   `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+   `checkout.session.async_payment_failed` et `checkout.session.expired`. Copiez son secret
+   `whsec_...` dans `STRIPE_WEBHOOK_SECRET`.
+5. Exécutez `supabase/complete-setup.sql` dans le SQL Editor Supabase pour installer les fonctions
+   transactionnelles de création de commande, la réservation/libération du stock et les tables
+   `shipping_zones` et `tax_rates`. La clé `SUPABASE_SERVICE_ROLE_KEY` reste exclusivement côté serveur.
+6. **Règles fiscales (administrables).** Dans `/admin/finance/taxes`, renseignez un taux de TVA par pays
+   desservi. Aucun taux n’est prérempli ; un pays sans taux actif et décidé bloque le paiement. Le
+   calcul Stripe des taxes n’est pas activé automatiquement : validez votre traitement fiscal (prix
+   TTC/HT, mentions légales) avant d’accepter des paiements réels.
+7. Faites un parcours complet avec les clés test et le webhook test. Passez `PAYMENTS_ENABLED=true`
+   seulement après avoir validé les règles réelles de livraison, de taxes et de commande; laissez
+   cette variable à `false` jusque-là.
+
+Le checkout facture en euros et les tarifs fournis sont ceux créés dans Stripe. Le paiement reste
+verrouillé (message clair, aucun montant fictif) tant que `PAYMENTS_ENABLED` n’est pas à `true` ou
+qu’une zone active n’a pas de tarif Stripe valide et un taux de TVA renseigné pour chacun de ses pays.
+Ne commitez jamais de clés Stripe ou Supabase et ne préfixez aucune clé secrète par `NEXT_PUBLIC_`.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 

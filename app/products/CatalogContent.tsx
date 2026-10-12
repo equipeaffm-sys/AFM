@@ -19,7 +19,8 @@ import {
   Eye,
   Scale,
   X,
-  Heart
+  Heart,
+  ShoppingBag
 } from 'lucide-react'
 import ProductSkeleton from '@/components/ProductSkeleton'
 import QuickViewModal from '@/components/QuickViewModal'
@@ -27,6 +28,7 @@ import { BLUR_DATA_URL, Product } from '@/lib/constants'
 import { useCurrency } from '@/components/CurrencyContext'
 import { useLanguage } from '@/components/LanguageContext'
 import { useSavedProducts } from '@/context/SavedProductsContext'
+import { useCart } from '@/components/CartContext'
 
 type SortOption = 'date-desc' | 'price-asc' | 'price-desc'
 
@@ -776,10 +778,26 @@ function CatalogProductCard({
   animationDelay: string
 }) {
   const [hovered, setHovered] = useState(false)
+  const { addItem } = useCart()
   const primaryImg = product.images[0]
   const secondaryImg = product.images[1] || primaryImg
 
   const hasSale = !!product.sale_price_cents
+  const addOrChooseVariant = () => {
+    if (variants.length > 0) {
+      onQuickView()
+      return
+    }
+    if (product.stock <= 0) return
+
+    addItem({
+      id: product.id,
+      title: product.title,
+      price_cents: product.sale_price_cents ?? product.price_cents,
+      image: primaryImg || '',
+      category: product.category,
+    })
+  }
 
   return (
     <article
@@ -936,6 +954,19 @@ function CatalogProductCard({
             {tView} <span aria-hidden="true">→</span>
           </Link>
         </div>
+        <button
+          type="button"
+          onClick={addOrChooseVariant}
+          disabled={variants.length === 0 && product.stock <= 0}
+          className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-[#8f8065]/50 bg-[#66563d]/30 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-[#e5d9bf] transition hover:border-[#b6a17d] hover:bg-[#66563d]/60 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-zinc-500 sm:text-xs"
+        >
+          <ShoppingBag className="h-4 w-4" aria-hidden="true" />
+          {variants.length > 0
+            ? 'Choisir une variante'
+            : product.stock > 0
+              ? 'Ajouter au panier'
+              : 'Indisponible'}
+        </button>
       </div>
     </article>
   )

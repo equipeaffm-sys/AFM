@@ -1,14 +1,18 @@
 'use client'
 
 import React from 'react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { X, Trash2, Plus, Minus, ShoppingBag, ImageOff } from 'lucide-react'
+import { X, Trash2, Plus, Minus, ShoppingBag, ImageOff, LockKeyhole } from 'lucide-react'
 import { useCart } from './CartContext'
 import { useCurrency } from './CurrencyContext'
 import { useLanguage } from './LanguageContext'
+import toast from 'react-hot-toast'
 
 export const CartDrawer: React.FC = () => {
+  const [checkoutEnabled, setCheckoutEnabled] = useState(false)
+  const [checkoutStatusError, setCheckoutStatusError] = useState(false)
+  const [isStartingCheckout, setIsStartingCheckout] = useState(false)
   const {
     cart,
     isCartOpen,
@@ -19,7 +23,7 @@ export const CartDrawer: React.FC = () => {
     totalCount,
   } = useCart()
 
-  const { formatPrice } = useCurrency()
+  const { formatPrice, currency } = useCurrency()
   const { t } = useLanguage()
 
   useEffect(() => {
@@ -37,6 +41,67 @@ export const CartDrawer: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
   }, [isCartOpen, setIsCartOpen])
+
+  useEffect(() => {
+    if (!isCartOpen || cart.length === 0) return
+    const controller = new AbortController()
+
+    fetch('/api/checkout', { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Impossible de vérifier la disponibilité du paiement.')
+        const result: unknown = await response.json()
+        if (typeof result !== 'object' || result === null || !('enabled' in result)) {
+          throw new Error('Réponse de disponibilité du paiement invalide.')
+        }
+        setCheckoutEnabled(result.enabled === true)
+        setCheckoutStatusError(false)
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        console.error('Unable to check Stripe Checkout availability:', error)
+        setCheckoutEnabled(false)
+        setCheckoutStatusError(true)
+      })
+
+    return () => controller.abort()
+  }, [isCartOpen, cart.length])
+
+  const startCheckout = async () => {
+    setIsStartingCheckout(true)
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: cart.map(({ id, quantity }) => ({ id, quantity })),
+        }),
+      })
+      const result: unknown = await response.json()
+      if (
+        !response.ok ||
+        typeof result !== 'object' ||
+        result === null ||
+        !('url' in result) ||
+        typeof result.url !== 'string'
+      ) {
+        const message =
+          typeof result === 'object' &&
+          result !== null &&
+          'error' in result &&
+          typeof result.error === 'string'
+            ? result.error
+            : 'Impossible de démarrer le paiement.'
+        throw new Error(message)
+      }
+      window.location.assign(result.url)
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Impossible de démarrer le paiement.'
+      toast.error(message)
+    } finally {
+      setIsStartingCheckout(false)
+    }
+  }
 
   if (!isCartOpen) return null
 
@@ -175,9 +240,33 @@ export const CartDrawer: React.FC = () => {
               </div>
 
               <div className="border-t border-white/[0.08] pt-3 text-center text-xs text-zinc-400">
-                Les commandes sont temporairement indisponibles, dans l’attente des conditions
-                de livraison.
+                {currency !== 'EUR'
+                  ? 'Le paiement sécurisé est actuellement disponible en euros uniquement.'
+                  : checkoutStatusError
+                    ? 'La disponibilité du paiement ne peut pas être vérifiée pour le moment.'
+                    : checkoutEnabled
+                      ? 'Le paiement sécurisé est assuré par Stripe. Les moyens disponibles dépendent de votre pays et de la configuration du compte.'
+                      : 'Le paiement en ligne sera ouvert après la configuration de Stripe et des conditions de livraison.'}
               </div>
+
+              <button
+                type="button"
+                onClick={startCheckout}
+                disabled={!checkoutEnabled || currency !== 'EUR' || isStartingCheckout}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#b6a17d] px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-zinc-950 transition-colors hover:bg-[#c2b18f] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
+              >
+                <LockKeyhole className="h-4 w-4" aria-hidden="true" />
+                {isStartingCheckout
+                  ? 'Préparation du paiement…'
+                  : checkoutEnabled && currency === 'EUR'
+                    ? 'Payer en toute sécurité'
+                    : 'Paiement bientôt disponible'}
+              </button>
+              {checkoutEnabled && currency === 'EUR' && (
+                <p className="text-center text-[10px] text-zinc-500">
+                  Vous serez redirigé vers le paiement sécurisé Stripe.
+                </p>
+              )}
             </div>
           )}
         </section>

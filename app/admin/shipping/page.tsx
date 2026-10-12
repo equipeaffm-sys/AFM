@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { ArrowLeft, Truck, Printer, RefreshCw, ShieldCheck, Search, FileText, X } from 'lucide-react'
+import { ArrowLeft, Truck, Printer, RefreshCw, Search, FileText, X } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { ShippingZonesManager } from '@/components/admin/ShippingZonesManager'
 
 interface ShippingOrder {
   id: string
@@ -29,19 +30,8 @@ interface ShippingOrder {
   }
 }
 
-interface ShippingZone {
-  id: string
-  zone_name: string
-  carrier_name: string
-  fee_cents: number
-  free_threshold_cents: number
-  is_active: boolean
-}
-
 export default function ShippingPage() {
   const [orders, setOrders] = useState<ShippingOrder[]>([])
-
-  const [zones] = useState<ShippingZone[]>([])
 
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedOrderForSlip, setSelectedOrderForSlip] = useState<ShippingOrder | null>(null)
@@ -156,38 +146,9 @@ export default function ShippingPage() {
           </button>
         </div>
 
-        {/* Shipping Zones Config Box */}
+        {/* Shipping Zones & Fees — administrable, source used by the server checkout */}
         <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm space-y-4">
-          <h2 className="font-serif text-base font-bold text-zinc-950 flex items-center gap-2 border-b border-zinc-100 pb-3">
-            <ShieldCheck className="w-4 h-4 text-[#C5A059]" />
-            1. Zones d&apos;Expédition &amp; Frais de Port Paramétrables
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-            {zones.length === 0 ? (
-              <p className="text-zinc-500">Aucune zone d’expédition configurée.</p>
-            ) : zones.map((z) => (
-              <div key={z.id} className="p-4 bg-[#FAF8F5] border border-zinc-200 rounded-xl space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-zinc-950 block">{z.zone_name}</span>
-                  <button
-                    type="button"
-                    disabled
-                    className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase cursor-pointer ${
-                      z.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-zinc-200 text-zinc-500'
-                    }`}
-                  >
-                    {z.is_active ? 'Actif' : 'Inactif'}
-                  </button>
-                </div>
-                <p className="text-zinc-500 text-[11px] font-light">Transporteur : {z.carrier_name}</p>
-                <div className="flex justify-between items-center pt-2 border-t border-zinc-200 text-[11px] font-mono">
-                  <span>Frais : {(z.fee_cents / 100).toFixed(2)} €</span>
-                  <span className="text-[#C5A059] font-bold">Gratuit dès {(z.free_threshold_cents / 100).toFixed(2)} €</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          <ShippingZonesManager />
         </div>
 
         {/* Order Tracking Assignment Table */}
