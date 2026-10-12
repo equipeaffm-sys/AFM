@@ -9,6 +9,9 @@ import { User as UserIcon, ShoppingBag, Edit2, Package, Clock, ShieldCheck, Lock
 import toast from 'react-hot-toast'
 import { useCart } from '@/components/CartContext'
 import { useCurrency } from '@/components/CurrencyContext'
+import { useSavedProducts } from '@/context/SavedProductsContext'
+import Image from 'next/image'
+import { Product } from '@/lib/constants'
 
 interface UserProfile {
   id: string
@@ -37,10 +40,12 @@ export default function AccountPage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordLoading, setPasswordLoading] = useState(false)
+  const [recentProducts, setRecentProducts] = useState<Product[]>([])
 
   const router = useRouter()
   const { cart, totalCount, subtotalCents, isHydrated, openCart } = useCart()
   const { formatPrice } = useCurrency()
+  const { recentlyViewedIds, isHydrated: savedProductsHydrated } = useSavedProducts()
 
   const loadAccountData = useCallback(async () => {
     try {
@@ -83,6 +88,39 @@ export default function AccountPage() {
   useEffect(() => {
     loadAccountData()
   }, [loadAccountData])
+
+  useEffect(() => {
+    if (!savedProductsHydrated) return
+    let cancelled = false
+
+    const loadRecentlyViewed = async () => {
+      if (recentlyViewedIds.length === 0) {
+        setRecentProducts([])
+        return
+      }
+      try {
+        const { data, error } = await createClient()
+          .from('products')
+          .select('*')
+          .in('id', recentlyViewedIds)
+          .eq('is_active', true)
+
+        if (error) throw error
+        if (!cancelled) {
+          const productsById = new Map((data || []).map((product) => [product.id, product as Product]))
+          setRecentProducts(recentlyViewedIds.map((id) => productsById.get(id)).filter((product): product is Product => !!product))
+        }
+      } catch (error) {
+        console.error('Unable to load recently viewed customer products:', error)
+        if (!cancelled) toast.error('Impossible de charger les articles récemment consultés.')
+      }
+    }
+
+    void loadRecentlyViewed()
+    return () => {
+      cancelled = true
+    }
+  }, [recentlyViewedIds, savedProductsHydrated])
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -260,6 +298,39 @@ export default function AccountPage() {
           )}
         </div>
       </section>
+
+      {recentProducts.length > 0 && (
+        <section id="recemment-vus" className="scroll-mt-28 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 sm:p-6">
+          <div className="mb-4 flex items-end justify-between gap-3">
+            <div>
+              <h2 className="font-serif text-xl text-zinc-100">Récemment consultés</h2>
+              <p className="mt-1 text-xs text-zinc-500">Vos derniers articles vus sur cet appareil.</p>
+            </div>
+            <Link href="/products" className="text-xs text-amber-300 hover:text-amber-200">Tout le catalogue</Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {recentProducts.slice(0, 4).map((product) => (
+              <Link key={product.id} href={`/products/${product.id}`} className="group overflow-hidden rounded-xl border border-white/[0.08] bg-zinc-950/50">
+                <div className="relative aspect-[4/5] bg-zinc-800">
+                  {product.images?.[0] && (
+                    <Image
+                      src={product.images[0]}
+                      alt={product.title}
+                      fill
+                      sizes="(max-width: 640px) 50vw, 25vw"
+                      className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                    />
+                  )}
+                </div>
+                <div className="p-3">
+                  <p className="line-clamp-1 font-serif text-sm text-zinc-200 group-hover:text-amber-200">{product.title}</p>
+                  <p className="mt-1 text-xs text-[#c2b18f]">{formatPrice(product.sale_price_cents || product.price_cents)}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

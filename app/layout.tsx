@@ -12,6 +12,7 @@ import ChatWidget from "@/components/ChatWidget";
 import InteractiveEffects from "@/components/InteractiveEffects";
 import ScrollUtilities from "@/components/ScrollUtilities";
 import PageTransitions from "@/components/PageTransitions";
+import { SavedProductsProvider } from "@/context/SavedProductsContext";
 import { Toaster } from "react-hot-toast";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://lm-maison.com";
@@ -67,6 +68,7 @@ export default function RootLayout({
         <LanguageProvider>
           <CurrencyProvider>
             <CartProvider>
+              <SavedProductsProvider>
               <Toaster
                 position="bottom-right"
                 toastOptions={{
@@ -89,6 +91,7 @@ export default function RootLayout({
               <ChatWidget />
               <CookieBanner />
               <Footer />
+              </SavedProductsProvider>
             </CartProvider>
           </CurrencyProvider>
         </LanguageProvider>

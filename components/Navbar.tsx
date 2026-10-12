@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { ShoppingBag, Search, Menu, X, User } from "lucide-react";
+import { ShoppingBag, Search, Menu, X, User, Heart } from "lucide-react";
 import { useCart } from "./CartContext";
 import { useLanguage } from "./LanguageContext";
 import SearchModal from "./SearchModal";
 import MegaMenu from "./MegaMenu";
 import { createClient } from "@/lib/supabase/client";
+import { useSavedProducts } from "@/context/SavedProductsContext";
 
 export default function Navbar() {
   const [accountName, setAccountName] = useState<string | null>(null);
@@ -20,6 +21,7 @@ export default function Navbar() {
   const [announcementActive, setAnnouncementActive] = useState<boolean>(false);
 
   const { totalCount, toggleCart } = useCart();
+  const { favoriteIds, isHydrated: savedProductsHydrated } = useSavedProducts();
   const { language, t } = useLanguage();
 
   useEffect(() => {
@@ -224,6 +226,19 @@ export default function Navbar() {
               <span className="hidden max-w-32 truncate text-[10px] font-medium normal-case tracking-normal lg:inline">
                 {accountName || "Mon compte"}
               </span>
+            </Link>
+
+            <Link
+              href="/wishlist"
+              aria-label={`Liste d’envies${savedProductsHydrated ? `, ${favoriteIds.length} article(s)` : ''}`}
+              className="motion-link nav-icon-control relative p-1 text-[#c9c6be] hover:text-[#e8e5de]"
+            >
+              <Heart className="h-5 w-5 stroke-[1.5]" aria-hidden="true" />
+              {savedProductsHydrated && favoriteIds.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#b6a17d] px-1 text-[9px] font-bold text-[#191a19]">
+                  {favoriteIds.length > 99 ? '99+' : favoriteIds.length}
+                </span>
+              )}
             </Link>
 
             <button

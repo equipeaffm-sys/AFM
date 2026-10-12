@@ -16,6 +16,7 @@ import {
 import { useCart } from '@/components/CartContext'
 import { useCurrency } from '@/components/CurrencyContext'
 import { useLanguage } from '@/components/LanguageContext'
+import { useSavedProducts } from '@/context/SavedProductsContext'
 import { BLUR_DATA_URL, Product } from '@/lib/constants'
 
 interface Variant {
@@ -47,6 +48,7 @@ export default function ProductDetailClient({ productId }: { productId: string }
   const primaryBuyButtonRef = useRef<HTMLButtonElement | null>(null)
 
   const { addItem, openCart } = useCart()
+  const { markViewed } = useSavedProducts()
   const { formatPrice } = useCurrency()
   const { t } = useLanguage()
 
@@ -62,6 +64,7 @@ export default function ProductDetailClient({ productId }: { productId: string }
 
         if (prodData) {
           setProduct(prodData)
+          markViewed(prodData.id)
         }
 
         const { data: varData } = await supabase
@@ -84,7 +87,7 @@ export default function ProductDetailClient({ productId }: { productId: string }
     if (productId) {
       fetchProductAndVariants()
     }
-  }, [productId])
+  }, [productId, markViewed])
 
   // Scroll listener for Mobile Sticky Add-to-Cart Bar
   useEffect(() => {

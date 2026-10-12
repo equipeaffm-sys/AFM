@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { ArrowLeft, RefreshCw, PackageCheck } from 'lucide-react'
+import { ArrowLeft, RefreshCw, PackageCheck, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Product } from '@/lib/constants'
 
@@ -33,6 +33,31 @@ export default function InventoryPage() {
   useEffect(() => {
     loadProducts()
   }, [])
+
+  const exportInventory = () => {
+    const csvCell = (value: string | number) => {
+      const safeValue = String(value).replace(/^[\s]*[=+\-@]/, "'$&")
+      return `"${safeValue.replace(/"/g, '""')}"`
+    }
+    const rows = [
+      ['Produit', 'Categorie', 'Stock', 'Seuil alerte', 'Prix EUR', 'Actif'],
+      ...products.map((product) => [
+        product.title,
+        product.category,
+        product.stock,
+        product.low_stock_threshold ?? 3,
+        (product.price_cents / 100).toFixed(2),
+        product.is_active ? 'Oui' : 'Non',
+      ]),
+    ]
+    const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(';')).join('\r\n')}`
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `inventaire-lm-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   // 1-Click Stock Replenishment (+10 Items)
   const handleReplenish = async (productId: string, currentStock: number, addQuantity: number = 10) => {
@@ -97,9 +122,20 @@ export default function InventoryPage() {
 
           <button
             onClick={loadProducts}
+            aria-label="Actualiser l’inventaire"
+            title="Actualiser"
             className="p-3 bg-[#FAF8F5] border border-zinc-200 text-zinc-700 hover:text-[#C5A059] rounded-xl transition-colors self-start md:self-auto"
           >
             <RefreshCw className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={exportInventory}
+            disabled={loading || products.length === 0}
+            className="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-wider text-zinc-700 transition-colors hover:border-[#C5A059] hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            Exporter CSV
           </button>
         </div>
 

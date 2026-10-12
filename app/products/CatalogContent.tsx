@@ -18,13 +18,15 @@ import {
   LayoutGrid,
   Eye,
   Scale,
-  X
+  X,
+  Heart
 } from 'lucide-react'
 import ProductSkeleton from '@/components/ProductSkeleton'
 import QuickViewModal from '@/components/QuickViewModal'
 import { BLUR_DATA_URL, Product } from '@/lib/constants'
 import { useCurrency } from '@/components/CurrencyContext'
 import { useLanguage } from '@/components/LanguageContext'
+import { useSavedProducts } from '@/context/SavedProductsContext'
 
 type SortOption = 'date-desc' | 'price-asc' | 'price-desc'
 
@@ -60,6 +62,7 @@ export default function CatalogContent() {
 
   const { formatPrice } = useCurrency()
   const { t } = useLanguage()
+  const { favoriteIds, toggleFavorite, isHydrated: savedProductsHydrated } = useSavedProducts()
 
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<CatalogCategory[]>([])
@@ -84,10 +87,33 @@ export default function CatalogContent() {
 
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
   const [gridMode, setGridMode] = useState<'compact' | 'comfortable'>('compact')
+  const [gridPreferenceLoaded, setGridPreferenceLoaded] = useState(false)
   const [variantPreviews, setVariantPreviews] = useState<Record<string, CatalogVariantPreview[]>>({})
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null)
   const [compareIds, setCompareIds] = useState<string[]>([])
   const [compareOpen, setCompareOpen] = useState(false)
+
+  useEffect(() => {
+    try {
+      const savedGridMode = localStorage.getItem('lm_catalog_grid_mode')
+      if (savedGridMode === 'compact' || savedGridMode === 'comfortable') {
+        setGridMode(savedGridMode)
+      }
+    } catch (error) {
+      console.error('Unable to read catalog grid preference:', error)
+    } finally {
+      setGridPreferenceLoaded(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!gridPreferenceLoaded) return
+    try {
+      localStorage.setItem('lm_catalog_grid_mode', gridMode)
+    } catch (error) {
+      console.error('Unable to save catalog grid preference:', error)
+    }
+  }, [gridMode, gridPreferenceLoaded])
 
   useEffect(() => {
     if (!compareOpen) return
@@ -580,6 +606,9 @@ export default function CatalogContent() {
                 isComparing={compareIds.includes(product.id)}
                 comparisonLimitReached={compareIds.length >= 3 && !compareIds.includes(product.id)}
                 onCompare={() => handleCompareToggle(product.id)}
+                isFavorite={favoriteIds.includes(product.id)}
+                favoriteStateReady={savedProductsHydrated}
+                onFavorite={() => toggleFavorite(product.id)}
                 animationDelay={`${Math.min(index, 7) * 65}ms`}
               />
             ))}
@@ -726,6 +755,9 @@ function CatalogProductCard({
   isComparing,
   comparisonLimitReached,
   onCompare,
+  isFavorite,
+  favoriteStateReady,
+  onFavorite,
   animationDelay,
 }: {
   product: Product
@@ -738,6 +770,9 @@ function CatalogProductCard({
   isComparing: boolean
   comparisonLimitReached: boolean
   onCompare: () => void
+  isFavorite: boolean
+  favoriteStateReady: boolean
+  onFavorite: () => void
   animationDelay: string
 }) {
   const [hovered, setHovered] = useState(false)
@@ -808,6 +843,18 @@ function CatalogProductCard({
           </span>
         )}
         </Link>
+        <button
+          type="button"
+          disabled={!favoriteStateReady}
+          onClick={onFavorite}
+          aria-pressed={isFavorite}
+          aria-label={`${isFavorite ? 'Retirer des' : 'Ajouter aux'} favoris : ${product.title}`}
+          className={`absolute right-3 top-14 z-[3] inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-[#191a19]/85 shadow-lg backdrop-blur transition hover:border-[#b6a17d]/60 ${
+            isFavorite ? 'text-rose-300' : 'text-zinc-200 hover:text-rose-200'
+          } disabled:cursor-wait`}
+        >
+          <Heart className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} aria-hidden="true" />
+        </button>
         <button
           type="button"
           onClick={onQuickView}
