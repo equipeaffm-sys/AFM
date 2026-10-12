@@ -30,9 +30,22 @@ de passe ou une clé Supabase privée dans le code, le navigateur ou Git.
    Le bucket est public pour servir les images : n’ajoutez jamais de règle d’upload publique.
    Supabase gère déjà RLS et la propriété de sa table Storage; le script ne tente pas de les
    modifier.
-2. Créez votre propre utilisateur avec une adresse e-mail que vous contrôlez, via l’inscription
+2. Pour envoyer les e-mails de compte via Resend, vérifiez un domaine d’envoi dans Resend, puis
+   ouvrez **Authentication → Email → SMTP Settings** dans Supabase et activez le SMTP
+   personnalisé :
+
+   - Hôte : `smtp.resend.com`
+   - Port : `465`
+   - Identifiant : `resend`
+   - Mot de passe : une clé API Resend (à saisir dans Supabase, jamais dans le dépôt)
+   - Expéditeur : une adresse appartenant au domaine vérifié dans Resend
+
+   Configurez ensuite les modèles de confirmation et de réinitialisation sous
+   **Authentication → Email Templates** et vérifiez que l’URL de redirection autorisée du site
+   est configurée sous **Authentication → URL Configuration**.
+3. Créez votre propre utilisateur avec une adresse e-mail que vous contrôlez, via l’inscription
    du site ou Supabase **Authentication → Users**. Confirmez l’adresse e-mail.
-3. Dans Supabase **SQL Editor**, vérifiez que le compte possède bien un profil client :
+4. Dans Supabase **SQL Editor**, vérifiez que le compte possède bien un profil client :
 
    ```sql
    SELECT profiles.id, profiles.email, profiles.role
@@ -42,7 +55,7 @@ de passe ou une clé Supabase privée dans le code, le navigateur ou Git.
      AND users.email_confirmed_at IS NOT NULL;
    ```
 
-4. Après avoir vérifié qu’une seule ligne correspond à votre propre compte, attribuez-lui le
+5. Après avoir vérifié qu’une seule ligne correspond à votre propre compte, attribuez-lui le
    rôle administrateur en remplaçant l’adresse dans cette requête :
 
    ```sql
@@ -59,7 +72,7 @@ de passe ou une clé Supabase privée dans le code, le navigateur ou Git.
    l’adresse et vérifié le compte retourné. Elle ne retourne aucune ligne si le compte n’existe
    pas ou si son adresse n’est pas confirmée.
 
-5. Connectez-vous sur `/login?redirect=%2Fadmin` avec l’adresse et le mot de passe que vous
+6. Connectez-vous sur `/login?redirect=%2Fadmin` avec l’adresse et le mot de passe que vous
    avez choisis dans Supabase. Activez l’authentification multifacteur dans Supabase pour ce
    compte et conservez les moyens de récupération en lieu sûr.
 

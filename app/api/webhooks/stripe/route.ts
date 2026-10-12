@@ -80,15 +80,19 @@ export async function POST(request: Request) {
       if (customerEmail && resendApiKey && resendFromEmail) {
         const resend = new Resend(resendApiKey)
         try {
-          await resend.emails.send({
+          const { error: emailError } = await resend.emails.send({
             from: resendFromEmail,
             to: customerEmail,
             subject: 'Confirmation de paiement',
+            text: `Votre paiement pour la commande ${orderId} a été confirmé. Montant payé : ${(amountTotalCents / 100).toFixed(2)} €.`,
             html: `
-              <p>Votre paiement pour la commande ${orderId} a été confirmé.</p>
-              <p>Montant payé : ${(amountTotalCents / 100).toFixed(2)} €.</p>
+              <p>Votre paiement pour la commande <strong>${escapeHtml(orderId)}</strong> a été confirmé.</p>
+              <p>Montant payé : <strong>${(amountTotalCents / 100).toFixed(2)} €</strong>.</p>
             `,
           })
+          if (emailError) {
+            console.error('Unable to send order confirmation email:', emailError.message)
+          }
         } catch (error) {
           console.error('Unable to send order confirmation email:', error)
         }
@@ -101,4 +105,17 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ received: true })
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }
+    return entities[character]
+  })
 }

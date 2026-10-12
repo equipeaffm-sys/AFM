@@ -6,7 +6,11 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 function LoginForm() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [isSignUp, setIsSignUp] = useState(false)
+  const [isForgotPassword, setIsForgotPassword] = useState(false)
+  const [isRecovery, setIsRecovery] = useState(searchParams.get('reset') === '1')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
@@ -14,8 +18,6 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
-  const router = useRouter()
-  const searchParams = useSearchParams()
   const requestedRedirect = searchParams.get('redirect') || '/account'
   const redirectPath =
     requestedRedirect.startsWith('/') &&
@@ -32,7 +34,19 @@ function LoginForm() {
 
     try {
       const supabase = createClient()
-      if (isSignUp) {
+      if (isRecovery) {
+        const { error: updateError } = await supabase.auth.updateUser({ password })
+        if (updateError) throw updateError
+        setPassword('')
+        setIsRecovery(false)
+        setMessage('Votre mot de passe a été modifié. Vous pouvez vous connecter.')
+      } else if (isForgotPassword) {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/login?reset=1`,
+        })
+        if (resetError) throw resetError
+        setMessage('Si cette adresse correspond à un compte, un lien de réinitialisation va être envoyé.')
+      } else if (isSignUp) {
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -89,12 +103,22 @@ function LoginForm() {
           L&M
         </Link>
         <h2 className="mt-4 text-2xl font-serif text-zinc-100">
-          {isSignUp ? 'Créer un compte' : 'Espace Personnel'}
+          {isRecovery
+            ? 'Nouveau mot de passe'
+            : isForgotPassword
+              ? 'Réinitialiser le mot de passe'
+              : isSignUp
+                ? 'Créer un compte'
+                : 'Espace Personnel'}
         </h2>
         <p className="mt-2 text-sm text-zinc-400">
-          {isSignUp
-            ? 'Rejoignez la Maison L&M pour accéder à nos services exclusifs'
-            : 'Connectez-vous pour accéder à vos commandes et privilèges'}
+          {isRecovery
+            ? 'Choisissez un nouveau mot de passe pour votre compte.'
+            : isForgotPassword
+              ? 'Saisissez votre adresse e-mail pour recevoir un lien de réinitialisation.'
+              : isSignUp
+                ? 'Rejoignez la Maison L&M pour accéder à nos services exclusifs'
+                : 'Connectez-vous pour accéder à vos commandes et privilèges'}
         </p>
       </div>
 
@@ -112,7 +136,7 @@ function LoginForm() {
 
       <form className="mt-8 space-y-6" onSubmit={handleAuth}>
         <div className="space-y-4">
-          {isSignUp && (
+          {isSignUp && !isRecovery && (
             <div>
               <label htmlFor="full-name" className="block text-xs font-medium text-zinc-300 uppercase tracking-wider mb-1">
                 Nom complet
@@ -130,39 +154,43 @@ function LoginForm() {
             </div>
           )}
 
-          <div>
-            <label htmlFor="email-address" className="block text-xs font-medium text-zinc-300 uppercase tracking-wider mb-1">
-              Adresse email
-            </label>
-            <input
-              id="email-address"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-amber-500 text-sm transition-colors"
-              placeholder="votre@email.com"
-            />
-          </div>
+          {!isRecovery && (
+            <div>
+              <label htmlFor="email-address" className="block text-xs font-medium text-zinc-300 uppercase tracking-wider mb-1">
+                Adresse email
+              </label>
+              <input
+                id="email-address"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-amber-500 text-sm transition-colors"
+                placeholder="votre@email.com"
+              />
+            </div>
+          )}
 
-          <div>
-            <label htmlFor="password" className="block text-xs font-medium text-zinc-300 uppercase tracking-wider mb-1">
-              Mot de passe
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete={isSignUp ? 'new-password' : 'current-password'}
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-amber-500 text-sm transition-colors"
-              placeholder="••••••••"
-            />
-          </div>
+          {!isForgotPassword && (
+            <div>
+              <label htmlFor="password" className="block text-xs font-medium text-zinc-300 uppercase tracking-wider mb-1">
+                {isRecovery ? 'Nouveau mot de passe' : 'Mot de passe'}
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete={isSignUp || isRecovery ? 'new-password' : 'current-password'}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-amber-500 text-sm transition-colors"
+                placeholder="••••••••"
+              />
+            </div>
+          )}
         </div>
 
         <div>
@@ -173,28 +201,46 @@ function LoginForm() {
           >
             {loading
               ? 'Traitement en cours...'
-              : isSignUp
-              ? 'S\'inscrire'
-              : 'Se connecter'}
+              : isRecovery
+                ? 'Modifier le mot de passe'
+                : isForgotPassword
+                  ? 'Envoyer le lien'
+                  : isSignUp
+                    ? 'S\'inscrire'
+                    : 'Se connecter'}
           </button>
         </div>
       </form>
 
-      <div className="text-center pt-2">
-        <button
-          type="button"
-          onClick={() => {
-            setIsSignUp(!isSignUp)
-            setError(null)
-            setMessage(null)
-          }}
-          className="text-xs text-zinc-400 hover:text-amber-400 transition-colors underline underline-offset-4"
-        >
-          {isSignUp
-            ? 'Déjà un compte ? Se connecter'
-            : 'Nouveau client ? Créer un compte'}
-        </button>
-      </div>
+      {!isRecovery && (
+        <div className="space-y-3 text-center pt-2">
+          {!isSignUp && !isForgotPassword && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsForgotPassword(true)
+                setError(null)
+                setMessage(null)
+              }}
+              className="block mx-auto text-xs text-zinc-400 hover:text-amber-400 transition-colors underline underline-offset-4"
+            >
+              Mot de passe oublié ?
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setIsSignUp(!isSignUp && !isForgotPassword)
+              setIsForgotPassword(false)
+              setError(null)
+              setMessage(null)
+            }}
+            className="text-xs text-zinc-400 hover:text-amber-400 transition-colors underline underline-offset-4"
+          >
+            {isSignUp || isForgotPassword ? 'Retour à la connexion' : 'Nouveau client ? Créer un compte'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

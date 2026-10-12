@@ -53,6 +53,25 @@ serveur. L’endpoint compatible OpenAI `https://api.x.ai/v1/chat/completions` e
 Redémarrez le serveur après modification. La clé est lue uniquement côté serveur : ne la
 préfixez pas par `NEXT_PUBLIC_` et ne la commitez pas.
 
+## E-mails avec Resend
+
+Pour les e-mails d’inscription, de confirmation d’adresse et de réinitialisation du mot de
+passe, configurez Resend comme SMTP personnalisé dans Supabase **Authentication → Email →
+SMTP Settings**. Vérifiez d’abord votre domaine d’envoi dans Resend, puis utilisez l’hôte
+`smtp.resend.com`, le port `465`, l’identifiant `resend` et votre clé API Resend comme mot de
+passe. Choisissez comme expéditeur une adresse de ce domaine vérifié et configurez les modèles
+d’e-mail dans **Authentication → Email Templates**. Ces messages sont générés par Supabase Auth
+afin de conserver des liens de confirmation et de récupération sûrs. Le formulaire `/login`
+permet au client de demander un lien « Mot de passe oublié ? » puis de choisir son nouveau mot
+de passe après l’avoir ouvert.
+
+Le webhook Stripe envoie aussi un e-mail de confirmation de paiement avec Resend lorsque
+`RESEND_API_KEY` et `RESEND_FROM_EMAIL` sont configurées côté serveur. Ajoutez ces deux
+variables dans Vercel avec une clé API Resend et une adresse expéditeur vérifiée. Le paiement
+de la boutique reste actuellement désactivé tant que les conditions de livraison ne sont pas
+configurées; l’e-mail de commande ne sera donc envoyé qu’après activation d’un flux de paiement
+réel. N’utilisez jamais `NEXT_PUBLIC_` pour une clé Resend.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More
