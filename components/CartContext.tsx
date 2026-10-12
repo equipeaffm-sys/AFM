@@ -20,6 +20,7 @@ interface CartContextType {
   clearCart: () => void
   totalCount: number
   subtotalCents: number
+  isHydrated: boolean
   isCartOpen: boolean
   setIsCartOpen: (open: boolean) => void
   toggleCart: () => void
@@ -124,6 +125,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         clearCart,
         totalCount,
         subtotalCents,
+        isHydrated,
         isCartOpen,
         setIsCartOpen,
         toggleCart,

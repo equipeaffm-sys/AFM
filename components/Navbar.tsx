@@ -10,6 +10,7 @@ import MegaMenu from "./MegaMenu";
 import { createClient } from "@/lib/supabase/client";
 
 export default function Navbar() {
+  const [accountName, setAccountName] = useState<string | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -20,6 +21,49 @@ export default function Navbar() {
 
   const { totalCount, toggleCart } = useCart();
   const { language, t } = useLanguage();
+
+  useEffect(() => {
+    const supabase = createClient();
+    let active = true;
+
+    const loadAccountName = async (userId: string | null) => {
+      if (!userId) {
+        if (active) setAccountName(null);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Unable to load customer name for navigation:", error);
+        return;
+      }
+      if (active) setAccountName(data?.full_name?.trim() || null);
+    };
+
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (error) {
+        console.error("Unable to check customer session for navigation:", error);
+        return;
+      }
+      void loadAccountName(data.user?.id ?? null);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      void loadAccountName(session?.user.id ?? null);
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     let previousScrollY = window.scrollY
@@ -173,10 +217,13 @@ export default function Navbar() {
 
             <Link
               href="/account"
-              aria-label="Compte client"
-              className="motion-link nav-icon-control p-1 text-[#c9c6be] hover:text-[#e8e5de] hidden sm:block"
+              aria-label={accountName ? `Compte de ${accountName}` : "Compte client"}
+              className="motion-link nav-icon-control flex items-center gap-2 p-1 text-[#c9c6be] hover:text-[#e8e5de]"
             >
               <User className="w-5 h-5 stroke-[1.5]" />
+              <span className="hidden max-w-32 truncate text-[10px] font-medium normal-case tracking-normal lg:inline">
+                {accountName || "Mon compte"}
+              </span>
             </Link>
 
             <button

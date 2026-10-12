@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { User } from '@supabase/supabase-js'
-import { User as UserIcon, ShoppingBag, Edit2, Package, Clock, ShieldCheck, LockKeyhole } from 'lucide-react'
+import { User as UserIcon, ShoppingBag, Edit2, Package, Clock, ShieldCheck, LockKeyhole, ArrowRight, CheckCircle2, ShoppingCart } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useCart } from '@/components/CartContext'
+import { useCurrency } from '@/components/CurrencyContext'
 
 interface UserProfile {
   id: string
@@ -37,6 +39,8 @@ export default function AccountPage() {
   const [passwordLoading, setPasswordLoading] = useState(false)
 
   const router = useRouter()
+  const { cart, totalCount, subtotalCents, isHydrated, openCart } = useCart()
+  const { formatPrice } = useCurrency()
 
   const loadAccountData = useCallback(async () => {
     try {
@@ -176,31 +180,91 @@ export default function AccountPage() {
     )
   }
 
+  const firstName = profile?.full_name?.trim().split(/\s+/)[0] || 'cher client'
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-16 text-zinc-100 space-y-8">
-      {/* Header */}
-      <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-8 backdrop-blur-md shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <span className="text-xs uppercase tracking-widest text-amber-500 font-medium">Maison L&M</span>
-          <h1 className="text-3xl font-serif font-bold text-zinc-100 mt-1">Mon compte</h1>
-          <p className="text-zinc-400 text-sm font-light mt-1">
-            Consultez votre profil et l’historique de vos commandes.
-          </p>
+    <div className="max-w-6xl mx-auto px-4 py-12 sm:py-16 text-zinc-100 space-y-8">
+      <header className="overflow-hidden rounded-3xl border border-zinc-800 bg-[radial-gradient(ellipse_at_top,rgba(180,140,65,0.14),transparent_55%),rgba(24,24,27,0.72)] px-6 py-10 text-center shadow-2xl backdrop-blur-md sm:px-10">
+        <Link href="/" className="inline-flex flex-col items-center text-[#eeeae2] transition-colors hover:text-amber-300">
+          <span className="font-serif text-3xl font-light uppercase tracking-[0.28em]">
+            L<span className="font-normal text-amber-500">&amp;</span>M
+          </span>
+          <span className="mt-1 text-[8px] font-light uppercase tracking-[0.48em] text-zinc-500">
+            Boutique
+          </span>
+        </Link>
+        <div className="mt-7 flex items-center justify-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-300">
+          <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+          Session active
         </div>
-        <div className="flex items-center gap-3">
+        <h1 className="mt-3 font-serif text-3xl font-medium text-zinc-100 sm:text-4xl">
+          Bonjour, {firstName}
+        </h1>
+        <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-zinc-400">
+          Retrouvez vos informations, vos commandes et votre panier au même endroit.
+        </p>
+        <nav aria-label="Navigation du compte" className="mt-7 flex flex-wrap items-center justify-center gap-3">
+          <a href="#profil" className="rounded-full border border-zinc-700 px-4 py-2 text-xs text-zinc-300 transition-colors hover:border-amber-500/60 hover:text-amber-300">
+            Mon profil
+          </a>
+          <a href="#commandes" className="rounded-full border border-zinc-700 px-4 py-2 text-xs text-zinc-300 transition-colors hover:border-amber-500/60 hover:text-amber-300">
+            Mes commandes
+          </a>
+          <button onClick={openCart} className="rounded-full border border-amber-500/50 bg-amber-500/10 px-4 py-2 text-xs text-amber-200 transition-colors hover:bg-amber-500/20">
+            Mon panier ({isHydrated ? totalCount : '…'})
+          </button>
+        </nav>
+        <div className="mt-7 flex justify-center">
           <button
             onClick={handleSignOut}
-            className="px-5 py-2.5 border border-zinc-700 hover:border-red-500 text-zinc-300 hover:text-red-400 text-xs font-semibold uppercase tracking-wider rounded-lg transition-colors shadow-sm"
+            className="rounded-lg border border-zinc-700 px-5 py-2.5 text-xs font-semibold uppercase tracking-wider text-zinc-300 shadow-sm transition-colors hover:border-red-500 hover:text-red-400"
           >
             Déconnexion
           </button>
         </div>
-      </div>
+      </header>
+
+      <section aria-label="Résumé de votre espace" className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Compte connecté</p>
+          <p className="mt-2 truncate text-sm text-zinc-100">{profile?.full_name || user?.email}</p>
+          <p className="mt-1 truncate text-xs text-zinc-500">{user?.email}</p>
+        </div>
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Commandes enregistrées</p>
+          <p className="mt-2 font-serif text-2xl text-zinc-100">{orders.length}</p>
+          <a href="#commandes" className="mt-1 inline-flex items-center gap-1 text-xs text-amber-300 hover:text-amber-200">
+            Consulter l’historique <ArrowRight className="h-3 w-3" aria-hidden="true" />
+          </a>
+        </div>
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.04] p-5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Votre panier</p>
+          <p className="mt-2 font-serif text-2xl text-zinc-100">
+            {isHydrated ? `${totalCount} article${totalCount > 1 ? 's' : ''}` : 'Chargement…'}
+          </p>
+          <p className="mt-1 text-xs text-amber-200">{isHydrated ? formatPrice(subtotalCents) : ' '}</p>
+          <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+            {isHydrated
+              ? 'Panier conservé sur cet appareil pour vos prochaines visites.'
+              : 'Récupération du panier enregistré…'}
+          </p>
+          {isHydrated && cart.length > 0 && (
+            <button onClick={openCart} className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-amber-300 hover:text-amber-200">
+              Reprendre mon panier <ShoppingCart className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          )}
+          {isHydrated && cart.length === 0 && (
+            <Link href="/products" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-amber-300 hover:text-amber-200">
+              Découvrir la collection <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
+          )}
+        </div>
+      </section>
 
       {/* Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Profile Card & Saved Measurements */}
-        <div className="space-y-6">
+        <div id="profil" className="space-y-6 scroll-mt-28">
           <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-6 backdrop-blur-md shadow-xl space-y-6">
             <div className="flex items-center justify-between border-b border-zinc-800/80 pb-4">
               <div className="flex items-center gap-2.5 text-amber-500 font-serif text-lg font-bold">
@@ -324,7 +388,7 @@ export default function AccountPage() {
         </div>
 
         {/* Order History */}
-        <div className="lg:col-span-2 space-y-6">
+        <div id="commandes" className="lg:col-span-2 space-y-6 scroll-mt-28">
           <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-6 backdrop-blur-md shadow-xl space-y-6">
             <div className="flex items-center gap-2.5 text-amber-500 font-serif text-lg font-bold border-b border-zinc-800/80 pb-4">
               <ShoppingBag className="w-5 h-5" />
