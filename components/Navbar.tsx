@@ -2,11 +2,9 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { ShoppingBag, Search, Menu, X, User, Heart } from "lucide-react";
-import { useCart } from "./CartContext";
+import { Search, Menu, X, User, Heart } from "lucide-react";
 import { useLanguage } from "./LanguageContext";
 import SearchModal from "./SearchModal";
-import MegaMenu from "./MegaMenu";
 import { createClient } from "@/lib/supabase/client";
 import { useSavedProducts } from "@/context/SavedProductsContext";
 
@@ -20,9 +18,8 @@ export default function Navbar() {
   const [dbAnnouncement, setDbAnnouncement] = useState<Record<string, string> | null>(null);
   const [announcementActive, setAnnouncementActive] = useState<boolean>(false);
 
-  const { totalCount, toggleCart } = useCart();
   const { favoriteIds, isHydrated: savedProductsHydrated } = useSavedProducts();
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
 
   useEffect(() => {
     const supabase = createClient();
@@ -183,12 +180,23 @@ export default function Navbar() {
           {/* Left Navigation (Desktop) */}
           <div className="hidden md:flex items-center space-x-8 text-xs tracking-[0.2em] uppercase font-medium text-[#d0cdc5]">
             <Link
-              href="/products"
+              href="/nos-chiens"
               className="motion-link animated-underline relative py-2 text-[#d0cdc5] after:absolute after:inset-x-0 after:bottom-0 after:h-px after:origin-left after:scale-x-0 after:bg-[#b6a17d] after:transition-transform hover:text-[#e8e5de] hover:after:scale-x-100"
             >
-              {t.catalog}
+              Nos chiens
             </Link>
-            <MegaMenu />
+            <Link
+              href="/familles"
+              className="motion-link animated-underline relative py-2 text-[#d0cdc5] after:absolute after:inset-x-0 after:bottom-0 after:h-px after:origin-left after:scale-x-0 after:bg-[#b6a17d] after:transition-transform hover:text-[#e8e5de] hover:after:scale-x-100"
+            >
+              Familles
+            </Link>
+            <Link
+              href="/contact"
+              className="motion-link animated-underline relative py-2 text-[#d0cdc5] after:absolute after:inset-x-0 after:bottom-0 after:h-px after:origin-left after:scale-x-0 after:bg-[#b6a17d] after:transition-transform hover:text-[#e8e5de] hover:after:scale-x-100"
+            >
+              Contact
+            </Link>
           </div>
 
           {/* Brand Logo */}
@@ -230,7 +238,7 @@ export default function Navbar() {
 
             <Link
               href="/wishlist"
-              aria-label={`Liste d’envies${savedProductsHydrated ? `, ${favoriteIds.length} article(s)` : ''}`}
+              aria-label={`Favoris${savedProductsHydrated ? `, ${favoriteIds.length} compagnon(s)` : ''}`}
               className="motion-link nav-icon-control relative p-1 text-[#c9c6be] hover:text-[#e8e5de]"
             >
               <Heart className="h-5 w-5 stroke-[1.5]" aria-hidden="true" />
@@ -240,17 +248,6 @@ export default function Navbar() {
                 </span>
               )}
             </Link>
-
-            <button
-              onClick={toggleCart}
-              aria-label="Panier d'achats"
-              className="motion-link nav-icon-control relative p-1 text-[#c9c6be] hover:text-[#e8e5de] cursor-pointer"
-            >
-              <ShoppingBag className="w-5 h-5 stroke-[1.5]" />
-              <span key={totalCount} className="cart-count-pulse absolute -top-1 -right-1 bg-[#b6a17d] text-[#191a19] text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center shadow-sm">
-                {totalCount}
-              </span>
-            </button>
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -283,11 +280,25 @@ export default function Navbar() {
                   Recherche Instantanée
                 </button>
                 <Link
-                  href="/products"
+                  href="/nos-chiens"
                   onClick={() => setMobileMenuOpen(false)}
                   className="py-2 hover:text-[#c2b18f] transition-colors"
                 >
-                  {t.catalog}
+                  Nos chiens
+                </Link>
+                <Link
+                  href="/familles"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="py-2 hover:text-[#c2b18f] transition-colors"
+                >
+                  Familles
+                </Link>
+                <Link
+                  href="/contact"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="py-2 hover:text-[#c2b18f] transition-colors"
+                >
+                  Contact
                 </Link>
                 <Link
                   href="/account"

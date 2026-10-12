@@ -3,16 +3,29 @@
 import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Heart, Share2, ShoppingBag } from 'lucide-react'
+import { Heart, Share2, PawPrint } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/supabase/client'
-import { Product } from '@/lib/constants'
+import {
+  CATEGORY_LABELS,
+  STATUS_LABELS,
+  formatAgeLabel,
+  formatDogPrice,
+  type Dog,
+} from '@/lib/dogs'
+import { BLUR_DATA_URL } from '@/lib/constants'
 import { useCurrency } from '@/components/CurrencyContext'
 import { useSavedProducts } from '@/context/SavedProductsContext'
 
+const STATUS_STYLES: Record<Dog['status'], string> = {
+  available: 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200',
+  reserved: 'border-amber-400/40 bg-amber-500/15 text-amber-200',
+  adopted: 'border-zinc-400/30 bg-zinc-500/15 text-zinc-300',
+}
+
 export default function WishlistPage() {
   const [sharedIds, setSharedIds] = useState<string[] | null>(null)
-  const [products, setProducts] = useState<Product[]>([])
+  const [dogs, setDogs] = useState<Dog[]>([])
   const [loading, setLoading] = useState(true)
   const { favoriteIds, toggleFavorite, isHydrated } = useSavedProducts()
   const { formatPrice } = useCurrency()
@@ -25,55 +38,55 @@ export default function WishlistPage() {
     setSharedIds(ids)
   }, [])
 
-  const productIds = useMemo(
+  const dogIds = useMemo(
     () => (sharedIds === null ? favoriteIds : sharedIds),
     [favoriteIds, sharedIds]
   )
-  const idsKey = productIds.join(',')
+  const idsKey = dogIds.join(',')
 
   useEffect(() => {
     if (!isHydrated) return
     let cancelled = false
-    const loadProducts = async () => {
+    const loadDogs = async () => {
       setLoading(true)
-      if (!productIds.length) {
-        setProducts([])
+      if (!dogIds.length) {
+        setDogs([])
         setLoading(false)
         return
       }
 
       try {
         const { data, error } = await createClient()
-          .from('products')
+          .from('dogs')
           .select('*')
-          .in('id', productIds)
-          .eq('is_active', true)
+          .in('id', dogIds)
+          .eq('is_published', true)
 
         if (error) throw error
         if (!cancelled) {
-          const availableProducts = data || []
-          const byId = new Map(availableProducts.map((product) => [product.id, product as Product]))
-          setProducts(productIds.map((id) => byId.get(id)).filter((product): product is Product => !!product))
+          const availableDogs = data || []
+          const byId = new Map(availableDogs.map((dog) => [dog.id, dog as Dog]))
+          setDogs(dogIds.map((id) => byId.get(id)).filter((dog): dog is Dog => !!dog))
         }
       } catch (error) {
-        console.error('Unable to load wishlist products:', error)
-        if (!cancelled) toast.error('Impossible de charger les articles enregistrés.')
+        console.error('Unable to load saved dogs:', error)
+        if (!cancelled) toast.error('Impossible de charger les compagnons enregistrés.')
       } finally {
         if (!cancelled) setLoading(false)
       }
     }
 
-    void loadProducts()
+    void loadDogs()
     return () => {
       cancelled = true
     }
-  }, [idsKey, isHydrated, productIds, sharedIds])
+  }, [idsKey, isHydrated, dogIds, sharedIds])
 
   const shareWishlist = async () => {
-    const url = `${window.location.origin}/wishlist?ids=${encodeURIComponent(productIds.join(','))}`
+    const url = `${window.location.origin}/wishlist?ids=${encodeURIComponent(dogIds.join(','))}`
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'Ma liste d’envies L&M', url })
+        await navigator.share({ title: 'Mes compagnons favoris — Maison L&M', url })
       } else {
         await navigator.clipboard.writeText(url)
         toast.success('Lien de partage copié.')
@@ -96,12 +109,12 @@ export default function WishlistPage() {
               L&amp;M Boutique
             </Link>
             <h1 className="mt-3 font-serif text-3xl font-medium sm:text-4xl">
-              {isSharedList ? 'Liste partagée' : 'Ma liste d’envies'}
+              {isSharedList ? 'Compagnons partagés' : 'Mes favoris'}
             </h1>
             <p className="mt-2 text-sm text-zinc-400">
               {isSharedList
-                ? 'Une sélection de produits Maison L&M partagée avec vous.'
-                : 'Enregistrez vos pièces préférées sur cet appareil et retrouvez-les ici.'}
+                ? 'Une sélection de compagnons Maison L&M partagée avec vous.'
+                : 'Enregistrez vos compagnons préférés sur cet appareil et retrouvez-les ici.'}
             </p>
           </div>
           {!isSharedList && productIds.length > 0 && (
@@ -126,44 +139,51 @@ export default function WishlistPage() {
           <section className="rounded-2xl border border-white/[0.08] bg-white/[0.025] px-6 py-16 text-center">
             <Heart className="mx-auto h-9 w-9 text-zinc-600" aria-hidden="true" />
             <h2 className="mt-4 font-serif text-xl">
-              {isSharedList ? 'Cette liste ne contient aucun article disponible.' : 'Votre liste est encore vide.'}
+              {isSharedList ? 'Cette liste ne contient aucun compagnon disponible.' : 'Votre liste de favoris est encore vide.'}
             </h2>
             <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-zinc-400">
               {isSharedList
-                ? 'Les articles désactivés ou retirés du catalogue ne sont pas affichés.'
-                : 'Touchez le cœur sur un article du catalogue pour le retrouver ici.'}
+                ? 'Les compagnons partagés n’ont pas pu être retrouvés.'
+                : 'Touchez le cœur sur une fiche pour retrouver le compagnon ici.'}
             </p>
             <Link
-              href="/products"
+              href="/nos-chiens"
               className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#c2b18f] px-5 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-950 transition-colors hover:bg-[#d6c8aa]"
             >
-              <ShoppingBag className="h-4 w-4" aria-hidden="true" />
-              Découvrir le catalogue
+              <PawPrint className="h-4 w-4" aria-hidden="true" />
+              Découvrir nos chiens
             </Link>
           </section>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4">
-            {products.map((product) => {
-              const isFavorite = favoriteIds.includes(product.id)
+            {dogs.map((dog) => {
+              const isFavorite = favoriteIds.includes(dog.id)
+              const ageLabel = formatAgeLabel(dog.birth_date)
+              const priceLabel = formatDogPrice(dog.price_cents, dog.price_on_request, formatPrice)
+              const coverImage = dog.images?.[0]
               return (
-                <article key={product.id} className="overflow-hidden rounded-xl border border-white/[0.09] bg-[#242523]">
+                <article key={dog.id} className="overflow-hidden rounded-xl border border-white/[0.09] bg-[#242523]">
                   <div className="relative aspect-[4/5] bg-[#2d2e2b]">
-                    <Link href={`/products/${product.id}`} aria-label={`Voir ${product.title}`}>
-                      {product.images?.[0] && (
+                    <Link href={`/nos-chiens/${dog.slug}`} aria-label={`Voir ${dog.name}`}>
+                      {coverImage ? (
                         <Image
-                          src={product.images[0]}
-                          alt={product.title}
+                          src={coverImage}
+                          alt={dog.name}
                           fill
                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                          placeholder="blur"
+                          blurDataURL={BLUR_DATA_URL}
                           className="object-cover transition-transform duration-500 hover:scale-[1.03]"
                         />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-4xl text-zinc-600">🐾</div>
                       )}
                     </Link>
                     {!isSharedList && (
                       <button
                         type="button"
-                        onClick={() => toggleFavorite(product.id)}
-                        aria-label="Retirer des favoris"
+                        onClick={() => toggleFavorite(dog.id)}
+                        aria-label={`Retirer ${dog.name} des favoris`}
                         className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-[#191a19]/90 text-rose-300 backdrop-blur"
                       >
                         <Heart className="h-4 w-4 fill-current" aria-hidden="true" />
@@ -172,7 +192,7 @@ export default function WishlistPage() {
                     {isSharedList && (
                       <button
                         type="button"
-                        onClick={() => toggleFavorite(product.id)}
+                        onClick={() => toggleFavorite(dog.id)}
                         aria-pressed={isFavorite}
                         aria-label={`${isFavorite ? 'Retirer des' : 'Ajouter aux'} favoris`}
                         className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-[#191a19]/90 backdrop-blur ${
@@ -182,15 +202,23 @@ export default function WishlistPage() {
                         <Heart className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} aria-hidden="true" />
                       </button>
                     )}
+                    <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5">
+                      <span className="rounded-full bg-[#191a19]/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c2b18f] backdrop-blur-md">
+                        {CATEGORY_LABELS[dog.category]}
+                      </span>
+                      <span className={`rounded-full border px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-widest ${STATUS_STYLES[dog.status]}`}>
+                        {STATUS_LABELS[dog.status]}
+                      </span>
+                    </div>
                   </div>
                   <div className="space-y-2 p-3 sm:p-4">
-                    <p className="text-[10px] uppercase tracking-wider text-[#c2b18f]">{product.category}</p>
-                    <Link href={`/products/${product.id}`} className="line-clamp-2 font-serif text-sm text-zinc-100 hover:text-[#d6c8aa]">
-                      {product.title}
+                    <Link href={`/nos-chiens/${dog.slug}`} className="line-clamp-2 font-serif text-sm text-zinc-100 hover:text-[#d6c8aa]">
+                      {dog.name}
                     </Link>
-                    <p className="font-serif font-semibold text-[#d6c8aa]">
-                      {formatPrice(product.sale_price_cents || product.price_cents)}
+                    <p className="text-[11px] font-light text-zinc-400">
+                      {[dog.breed, ageLabel].filter(Boolean).join(' · ') || 'Compagnon Maison L&M'}
                     </p>
+                    <p className="font-serif font-semibold text-[#d6c8aa]">{priceLabel}</p>
                   </div>
                 </article>
               )

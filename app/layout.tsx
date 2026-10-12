@@ -7,7 +7,6 @@ import CookieBanner from "@/components/CookieBanner";
 import { CartProvider } from "@/components/CartContext";
 import { CurrencyProvider } from "@/components/CurrencyContext";
 import { LanguageProvider } from "@/components/LanguageContext";
-import { CartDrawer } from "@/components/CartDrawer";
 import ChatWidget from "@/components/ChatWidget";
 import InteractiveEffects from "@/components/InteractiveEffects";
 import ScrollUtilities from "@/components/ScrollUtilities";
@@ -87,7 +86,6 @@ export default function RootLayout({
               <main className="flex-grow">
                 <PageTransitions>{children}</PageTransitions>
               </main>
-              <CartDrawer />
               <ChatWidget />
               <CookieBanner />
               <Footer />

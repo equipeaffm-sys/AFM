@@ -5,13 +5,17 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { User } from '@supabase/supabase-js'
-import { User as UserIcon, ShoppingBag, Edit2, Package, Clock, ShieldCheck, LockKeyhole, ArrowRight, CheckCircle2, ShoppingCart } from 'lucide-react'
+import { User as UserIcon, Edit2, ShieldCheck, LockKeyhole, ArrowRight, CheckCircle2, PawPrint } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useCart } from '@/components/CartContext'
 import { useCurrency } from '@/components/CurrencyContext'
 import { useSavedProducts } from '@/context/SavedProductsContext'
 import Image from 'next/image'
-import { Product } from '@/lib/constants'
+import {
+  CATEGORY_LABELS,
+  formatDogPrice,
+  type Dog,
+} from '@/lib/dogs'
+import { BLUR_DATA_URL } from '@/lib/constants'
 
 interface UserProfile {
   id: string
@@ -19,17 +23,9 @@ interface UserProfile {
   role?: string
 }
 
-interface Order {
-  id: string
-  status: string
-  total_cents: number
-  created_at: string
-}
-
 export default function AccountPage() {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
 
   // Profile Edit State
@@ -40,12 +36,11 @@ export default function AccountPage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordLoading, setPasswordLoading] = useState(false)
-  const [recentProducts, setRecentProducts] = useState<Product[]>([])
+  const [recentDogs, setRecentDogs] = useState<Dog[]>([])
 
   const router = useRouter()
-  const { cart, totalCount, subtotalCents, isHydrated, openCart } = useCart()
   const { formatPrice } = useCurrency()
-  const { recentlyViewedIds, isHydrated: savedProductsHydrated } = useSavedProducts()
+  const { favoriteIds, recentlyViewedIds, isHydrated: savedProductsHydrated } = useSavedProducts()
 
   const loadAccountData = useCallback(async () => {
     try {
@@ -62,21 +57,13 @@ export default function AccountPage() {
       }
 
       setUser(currentUser)
-      const [{ data: userProfile, error: profileError }, { data: userOrders, error: ordersError }] =
-        await Promise.all([
-          supabase.from('profiles').select('id, full_name, role').eq('id', currentUser.id).maybeSingle(),
-          supabase
-            .from('orders')
-            .select('id, status, total_cents, created_at')
-            .eq('user_id', currentUser.id)
-            .order('created_at', { ascending: false }),
-        ])
+      const [{ data: userProfile, error: profileError }] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, role').eq('id', currentUser.id).maybeSingle(),
+      ])
 
       if (profileError) throw profileError
-      if (ordersError) throw ordersError
       setProfile(userProfile)
       setFullNameInput(userProfile?.full_name || '')
-      setOrders(userOrders || [])
     } catch (error) {
       console.error('Unable to load customer account:', error)
       toast.error(error instanceof Error ? error.message : 'Impossible de charger les informations du compte.')
@@ -95,24 +82,24 @@ export default function AccountPage() {
 
     const loadRecentlyViewed = async () => {
       if (recentlyViewedIds.length === 0) {
-        setRecentProducts([])
+        setRecentDogs([])
         return
       }
       try {
         const { data, error } = await createClient()
-          .from('products')
+          .from('dogs')
           .select('*')
           .in('id', recentlyViewedIds)
-          .eq('is_active', true)
+          .eq('is_published', true)
 
         if (error) throw error
         if (!cancelled) {
-          const productsById = new Map((data || []).map((product) => [product.id, product as Product]))
-          setRecentProducts(recentlyViewedIds.map((id) => productsById.get(id)).filter((product): product is Product => !!product))
+          const dogsById = new Map((data || []).map((dog) => [dog.id, dog as Dog]))
+          setRecentDogs(recentlyViewedIds.map((id) => dogsById.get(id)).filter((dog): dog is Dog => !!dog))
         }
       } catch (error) {
-        console.error('Unable to load recently viewed customer products:', error)
-        if (!cancelled) toast.error('Impossible de charger les articles récemment consultés.')
+        console.error('Unable to load recently viewed dogs:', error)
+        if (!cancelled) toast.error('Impossible de charger les fiches récemment consultées.')
       }
     }
 
@@ -218,7 +205,7 @@ export default function AccountPage() {
     )
   }
 
-  const firstName = profile?.full_name?.trim().split(/\s+/)[0] || 'cher client'
+  const firstName = profile?.full_name?.trim().split(/\s+/)[0] || 'cher visiteur'
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-12 sm:py-16 text-zinc-100 space-y-8">
@@ -228,7 +215,7 @@ export default function AccountPage() {
             L<span className="font-normal text-amber-500">&amp;</span>M
           </span>
           <span className="mt-1 text-[8px] font-light uppercase tracking-[0.48em] text-zinc-500">
-            Boutique
+            Élevage
           </span>
         </Link>
         <div className="mt-7 flex items-center justify-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-300">
@@ -239,18 +226,18 @@ export default function AccountPage() {
           Bonjour, {firstName}
         </h1>
         <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-zinc-400">
-          Retrouvez vos informations, vos commandes et votre panier au même endroit.
+          Retrouvez vos informations, vos compagnons favoris et le suivi de vos demandes au même endroit.
         </p>
         <nav aria-label="Navigation du compte" className="mt-7 flex flex-wrap items-center justify-center gap-3">
           <a href="#profil" className="rounded-full border border-zinc-700 px-4 py-2 text-xs text-zinc-300 transition-colors hover:border-amber-500/60 hover:text-amber-300">
             Mon profil
           </a>
           <a href="#commandes" className="rounded-full border border-zinc-700 px-4 py-2 text-xs text-zinc-300 transition-colors hover:border-amber-500/60 hover:text-amber-300">
-            Mes commandes
+            Mes demandes
           </a>
-          <button onClick={openCart} className="rounded-full border border-amber-500/50 bg-amber-500/10 px-4 py-2 text-xs text-amber-200 transition-colors hover:bg-amber-500/20">
-            Mon panier ({isHydrated ? totalCount : '…'})
-          </button>
+          <Link href="/wishlist" className="rounded-full border border-amber-500/50 bg-amber-500/10 px-4 py-2 text-xs text-amber-200 transition-colors hover:bg-amber-500/20">
+            Mes favoris
+          </Link>
         </nav>
         <div className="mt-7 flex justify-center">
           <button
@@ -269,62 +256,61 @@ export default function AccountPage() {
           <p className="mt-1 truncate text-xs text-zinc-500">{user?.email}</p>
         </div>
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Commandes enregistrées</p>
-          <p className="mt-2 font-serif text-2xl text-zinc-100">{orders.length}</p>
-          <a href="#commandes" className="mt-1 inline-flex items-center gap-1 text-xs text-amber-300 hover:text-amber-200">
-            Consulter l’historique <ArrowRight className="h-3 w-3" aria-hidden="true" />
-          </a>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Compagnons à découvrir</p>
+          <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+            Parcourez nos compagnons disponibles et lancez une demande de réservation quand un profil vous correspond.
+          </p>
+          <Link href="/nos-chiens" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-amber-300 hover:text-amber-200">
+            Voir nos chiens <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Link>
         </div>
         <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.04] p-5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Votre panier</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Mes favoris</p>
           <p className="mt-2 font-serif text-2xl text-zinc-100">
-            {isHydrated ? `${totalCount} article${totalCount > 1 ? 's' : ''}` : 'Chargement…'}
+            {savedProductsHydrated ? `${favoriteIds.length} compagnon${favoriteIds.length > 1 ? 's' : ''}` : 'Chargement…'}
           </p>
-          <p className="mt-1 text-xs text-amber-200">{isHydrated ? formatPrice(subtotalCents) : ' '}</p>
           <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
-            {isHydrated
-              ? 'Panier conservé sur cet appareil pour vos prochaines visites.'
-              : 'Récupération du panier enregistré…'}
+            Retrouvez les chiens que vous avez gardés de côté sur cet appareil.
           </p>
-          {isHydrated && cart.length > 0 && (
-            <button onClick={openCart} className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-amber-300 hover:text-amber-200">
-              Reprendre mon panier <ShoppingCart className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          )}
-          {isHydrated && cart.length === 0 && (
-            <Link href="/products" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-amber-300 hover:text-amber-200">
-              Découvrir la collection <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </Link>
-          )}
+          <Link href="/wishlist" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-amber-300 hover:text-amber-200">
+            Voir mes favoris <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Link>
         </div>
       </section>
 
-      {recentProducts.length > 0 && (
+      {recentDogs.length > 0 && (
         <section id="recemment-vus" className="scroll-mt-28 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 sm:p-6">
           <div className="mb-4 flex items-end justify-between gap-3">
             <div>
               <h2 className="font-serif text-xl text-zinc-100">Récemment consultés</h2>
-              <p className="mt-1 text-xs text-zinc-500">Vos derniers articles vus sur cet appareil.</p>
+              <p className="mt-1 text-xs text-zinc-500">Vos dernières fiches vues sur cet appareil.</p>
             </div>
-            <Link href="/products" className="text-xs text-amber-300 hover:text-amber-200">Tout le catalogue</Link>
+            <Link href="/nos-chiens" className="text-xs text-amber-300 hover:text-amber-200">Voir tous nos chiens</Link>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {recentProducts.slice(0, 4).map((product) => (
-              <Link key={product.id} href={`/products/${product.id}`} className="group overflow-hidden rounded-xl border border-white/[0.08] bg-zinc-950/50">
+            {recentDogs.slice(0, 4).map((dog) => (
+              <Link key={dog.id} href={`/nos-chiens/${dog.slug}`} className="group overflow-hidden rounded-xl border border-white/[0.08] bg-zinc-950/50">
                 <div className="relative aspect-[4/5] bg-zinc-800">
-                  {product.images?.[0] && (
+                  {dog.images?.[0] ? (
                     <Image
-                      src={product.images[0]}
-                      alt={product.title}
+                      src={dog.images[0]}
+                      alt={dog.name}
                       fill
+                      placeholder="blur"
+                      blurDataURL={BLUR_DATA_URL}
                       sizes="(max-width: 640px) 50vw, 25vw"
                       className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                     />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-3xl text-zinc-600">🐾</div>
                   )}
+                  <span className="absolute left-2 top-2 rounded-full bg-[#191a19]/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#c2b18f] backdrop-blur-md">
+                    {CATEGORY_LABELS[dog.category]}
+                  </span>
                 </div>
                 <div className="p-3">
-                  <p className="line-clamp-1 font-serif text-sm text-zinc-200 group-hover:text-amber-200">{product.title}</p>
-                  <p className="mt-1 text-xs text-[#c2b18f]">{formatPrice(product.sale_price_cents || product.price_cents)}</p>
+                  <p className="line-clamp-1 font-serif text-sm text-zinc-200 group-hover:text-amber-200">{dog.name}</p>
+                  <p className="mt-1 text-xs text-[#c2b18f]">{formatDogPrice(dog.price_cents, dog.price_on_request, formatPrice)}</p>
                 </div>
               </Link>
             ))}
@@ -458,78 +444,68 @@ export default function AccountPage() {
           </div>
         </div>
 
-        {/* Order History */}
+        {/* Saved dogs & reservation info */}
         <div id="commandes" className="lg:col-span-2 space-y-6 scroll-mt-28">
           <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-6 backdrop-blur-md shadow-xl space-y-6">
             <div className="flex items-center gap-2.5 text-amber-500 font-serif text-lg font-bold border-b border-zinc-800/80 pb-4">
-              <ShoppingBag className="w-5 h-5" />
-              Historique des commandes
+              <PawPrint className="w-5 h-5" />
+              Mes favoris
             </div>
 
-            {orders.length === 0 ? (
+            {favoriteIds.length === 0 ? (
               <div className="py-12 text-center space-y-4 bg-zinc-950/40 rounded-xl border border-zinc-800/60 p-6">
-                <Package className="w-10 h-10 text-zinc-700 mx-auto" />
+                <PawPrint className="w-10 h-10 text-zinc-700 mx-auto" />
                 <p className="text-zinc-400 font-serif text-sm">
-                  Vous n&apos;avez aucune commande enregistrée pour le moment.
+                  Vous n&apos;avez encore enregistré aucun compagnon sur cet appareil.
                 </p>
                 <Link
-                  href="/products"
+                  href="/nos-chiens"
                   className="inline-block px-5 py-2.5 bg-amber-500 text-zinc-950 font-semibold text-xs uppercase tracking-wider rounded-lg hover:bg-amber-400 transition-colors shadow-md"
                 >
-                  Découvrir la collection
+                  Découvrir nos chiens
                 </Link>
               </div>
             ) : (
-              <div className="space-y-4">
-                {orders.map((order) => (
-                  <div
-                    key={order.id}
-                    className="bg-zinc-950/60 p-5 rounded-xl border border-zinc-800/80 space-y-4"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-semibold text-zinc-200">
-                            Commande #{order.id.substring(0, 8)}
-                          </span>
-                          <span
-                            className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
-                              order.status === 'paid'
-                                ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800'
-                                : 'bg-amber-950/60 text-amber-400 border-amber-800'
-                            }`}
-                          >
-                            {order.status === 'paid' ? 'Payée' : order.status}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2 text-zinc-500 text-xs font-light">
-                          <Clock className="w-3.5 h-3.5" />
-                          {new Date(order.created_at).toLocaleDateString('fr-FR', {
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric',
-                          })}
-                        </div>
-                      </div>
-
-                      <div className="text-right flex items-center gap-4 justify-between sm:justify-end border-t sm:border-t-0 border-zinc-800/80 pt-3 sm:pt-0">
-                        <div>
-                          <span className="text-[11px] text-zinc-500 uppercase tracking-wider block">Montant Total</span>
-                          <span className="text-base font-serif font-bold text-amber-500">
-                            {(order.total_cents / 100).toLocaleString('fr-FR', {
-                              style: 'currency',
-                              currency: 'EUR',
-                            })}
-                          </span>
-                        </div>
-
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="space-y-3 text-sm font-light text-zinc-300">
+                <p>
+                  Vous avez enregistré <span className="font-semibold text-amber-300">{favoriteIds.length}</span> compagnon
+                  {favoriteIds.length > 1 ? 's' : ''} sur cet appareil. Retrouvez-les, puis lancez une demande de réservation
+                  depuis la fiche qui vous intéresse.
+                </p>
+                <Link
+                  href="/wishlist"
+                  className="inline-flex items-center gap-2 rounded-lg border border-amber-500/60 bg-amber-500/10 px-5 py-2.5 text-xs font-semibold uppercase tracking-wider text-amber-300 transition-colors hover:bg-amber-500/20"
+                >
+                  Ouvrir mes favoris <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </Link>
               </div>
             )}
+          </div>
+
+          <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-6 backdrop-blur-md shadow-xl space-y-4">
+            <div className="flex items-center gap-2.5 text-amber-500 font-serif text-lg font-bold border-b border-zinc-800/80 pb-4">
+              <ShieldCheck className="w-5 h-5" />
+              Vos demandes de réservation
+            </div>
+            <p className="text-sm font-light leading-relaxed text-zinc-400">
+              Chaque demande de réservation est étudiée personnellement par notre élevage. Par respect pour la
+              confidentialité de nos familles, le suivi de vos échanges se fait directement par email ou par téléphone :
+              vous recevrez une réponse à l&apos;adresse indiquée lors de votre demande.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/contact"
+                className="inline-flex items-center gap-2 rounded-lg border border-white/[0.12] px-5 py-2.5 text-xs font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-[#8f8065] hover:text-white"
+              >
+                Nous contacter
+              </Link>
+              <Link
+                href="/faq"
+                className="inline-flex items-center gap-2 rounded-lg border border-white/[0.12] px-5 py-2.5 text-xs font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-[#8f8065] hover:text-white"
+              >
+                Consulter la FAQ
+              </Link>
+            </div>
           </div>
         </div>
       </div>

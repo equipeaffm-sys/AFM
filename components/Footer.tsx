@@ -3,11 +3,9 @@
 import Link from "next/link";
 import { Globe } from "lucide-react";
 import { useLanguage, Language } from "./LanguageContext";
-import { useCurrency, Currency } from "./CurrencyContext";
 
 export default function Footer() {
   const { language, setLanguage } = useLanguage();
-  const { currency, setCurrency } = useCurrency();
 
   return (
     <footer className="bg-[#151615] text-[#e6e3dc] border-t border-white/[0.07] pt-14 pb-10">
@@ -21,25 +19,46 @@ export default function Footer() {
               </span>
             </Link>
             <p className="max-w-xs text-xs text-zinc-400 font-light leading-relaxed">
-              Une boutique indépendante, avec des univers et des articles sélectionnés pour vous.
+              Élevage familial de chiens de race. Nous accompagnons chaque famille vers une adoption
+              épanouie, avec exigence et bienveillance.
             </p>
           </div>
 
-          {/* Collections Column */}
+          {/* Navigation Column */}
           <div>
             <h4 className="text-xs tracking-widest uppercase font-medium text-[#b6a17d] mb-6">
-              Collections
+              Navigation
             </h4>
             <ul className="space-y-3 text-xs font-light text-zinc-400">
               <li>
-                <Link href="/products" className="hover:text-[#eeeae2] transition-colors">
-                  Voir le catalogue
+                <Link href="/nos-chiens" className="hover:text-[#eeeae2] transition-colors">
+                  Nos chiots &amp; chiens
+                </Link>
+              </li>
+              <li>
+                <Link href="/a-propos" className="hover:text-[#eeeae2] transition-colors">
+                  Notre élevage
+                </Link>
+              </li>
+              <li>
+                <Link href="/familles" className="hover:text-[#eeeae2] transition-colors">
+                  Espace familles
+                </Link>
+              </li>
+              <li>
+                <Link href="/faq" className="hover:text-[#eeeae2] transition-colors">
+                  FAQ
+                </Link>
+              </li>
+              <li>
+                <Link href="/contact" className="hover:text-[#eeeae2] transition-colors">
+                  Réservation &amp; contact
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Maison Column */}
+          {/* La Maison Column */}
           <div>
             <h4 className="text-xs tracking-widest uppercase font-medium text-[#b6a17d] mb-6">
               La Maison
@@ -57,7 +76,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link href="/cgv" className="hover:text-[#eeeae2] transition-colors">
-                  CGV
+                  Conditions de vente
                 </Link>
               </li>
             </ul>
@@ -82,18 +101,6 @@ export default function Footer() {
                 <option value="EN" className="bg-[#0D0D0D] text-white">English (EN)</option>
                 <option value="ES" className="bg-[#0D0D0D] text-white">Español (ES)</option>
                 <option value="DE" className="bg-[#0D0D0D] text-white">Deutsch (DE)</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-md px-2.5 py-1 text-xs">
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value as Currency)}
-                className="bg-transparent text-[#c2b18f] font-medium focus:outline-none cursor-pointer"
-              >
-                <option value="EUR" className="bg-[#0D0D0D] text-white">EUR (€)</option>
-                <option value="USD" className="bg-[#0D0D0D] text-white">USD ($)</option>
-                <option value="GBP" className="bg-[#0D0D0D] text-white">GBP (£)</option>
               </select>
             </div>
           </div>

@@ -1,0 +1,91 @@
+npm notice run l-and-m-luxury@0.1.0 build
+npm notice run next build
+  ▲ Next.js 14.2.35
+  - Environments: .env.local
+
+   Creating an optimized production build ...
+Failed to compile.
+
+./app/contact/page.tsx
+Error: 
+  [31mx[0m You are attempting to export "metadata" from a component marked with "use client", which is disallowed. Either remove the export, or the "use client" directive. Read more: https://nextjs.org/
+  [31m|[0m docs/getting-started/react-essentials#the-use-client-directive
+  [31m|[0m 
+  [31m|[0m 
+    ,-[[36;1;4mC:\Users\Leugim\Desktop\Site\app\contact\page.tsx[0m:5:1]
+ [2m 5[0m | import { PawPrint } from 'lucide-react'
+ [2m 6[0m | import toast from 'react-hot-toast'
+ [2m 7[0m | 
+ [2m 8[0m | export const metadata: Metadata = {
+    : [31;1m             ^^^^^^^^[0m
+ [2m 9[0m |   title: 'Réservation & contact',
+ [2m10[0m |   description:
+ [2m10[0m |     'Candidatez pour l’adoption d’un compagnon ou inscrivez-vous à notre liste d’attente : échangeons sur votre projet avant toute validation.',
+    `----
+
+Import trace for requested module:
+./app/contact/page.tsx
+
+./app/faq/page.tsx
+Error: 
+  [31mx[0m You are attempting to export "metadata" from a component marked with "use client", which is disallowed. Either remove the export, or the "use client" directive. Read more: https://nextjs.org/
+  [31m|[0m docs/getting-started/react-essentials#the-use-client-directive
+  [31m|[0m 
+  [31m|[0m 
+    ,-[[36;1;4mC:\Users\Leugim\Desktop\Site\app\faq\page.tsx[0m:5:1]
+ [2m 5[0m | import Link from 'next/link'
+ [2m 6[0m | import { ChevronDown } from 'lucide-react'
+ [2m 7[0m | 
+ [2m 8[0m | export const metadata: Metadata = {
+    : [31;1m             ^^^^^^^^[0m
+ [2m 9[0m |   title: 'Questions fréquentes',
+ [2m10[0m |   description:
+ [2m10[0m |     'Garanties, transport sécurisé et processus de réservation : les réponses aux questions les plus courantes avant d’accueillir un compagnon.',
+    `----
+
+Import trace for requested module:
+./app/faq/page.tsx
+
+./components/SearchModal.tsx
+Error: 
+  [31mx[0m Unexpected token `(`. Expected identifier, string literal, numeric literal or [ for the computed key
+    ,-[[36;1;4mC:\Users\Leugim\Desktop\Site\components\SearchModal.tsx[0m:21:1]
+ [2m21[0m | }
+ [2m22[0m | 
+ [2m23[0m | function formatEur(cents: number): string {
+ [2m24[0m |   return `${{(cents / 100).toFixed(2).replace('.', ',')}} €`
+    : [31;1m             ^[0m
+ [2m25[0m | }
+ [2m26[0m | 
+ [2m26[0m | export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/SearchModal.tsx
+./components/Navbar.tsx
+
+./app/page.tsx
+Error: 
+  [31mx[0m Unexpected token `div`. Expected jsx identifier
+    ,-[[36;1;4mC:\Users\Leugim\Desktop\Site\app\page.tsx[0m:64:1]
+ [2m64[0m |   }, [])
+ [2m65[0m | 
+ [2m66[0m |   return (
+ [2m67[0m |     <div className="min-h-screen bg-[#191a19] text-[#e6e3dc]">
+    : [31;1m     ^^^[0m
+ [2m68[0m |       {/* Hero */}
+ [2m69[0m |       <section className="relative isolate flex min-h-[560px] h-[78svh] max-h-[760px] items-center overflow-hidden bg-[#292720]">
+ [2m69[0m |         <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_60%_20%,_#3a3527_0%,_#232420_55%,_#191a19_100%)]" />
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/page.tsx
+
+
+> Build failed because of webpack errors
