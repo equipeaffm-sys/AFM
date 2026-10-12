@@ -16,8 +16,12 @@ de passe ou une clé Supabase privée dans le code, le navigateur ou Git.
    structure différente, le script s’arrête sans changement : fais d’abord une migration
    dédiée au lieu de supprimer ou recréer tes tables.
    Le script ne configure pas les options d’authentification du tableau de bord Supabase :
-   activez l’inscription par e-mail et ajoutez les URL locales/de production dans
-   **Authentication → URL Configuration**.
+   activez l’inscription par e-mail dans **Authentication → Providers → Email**. Pour ne pas
+   demander de confirmation par e-mail avant la connexion, désactivez **Confirm email** dans
+   les options du fournisseur Email, puis ajoutez les URL locales/de production dans
+   **Authentication → URL Configuration**. La désactivation permet à toute personne de créer
+   un compte avec une adresse non vérifiée : utilisez un mot de passe robuste et ne prenez pas
+   l’adresse comme preuve d’identité.
    Si le résultat SQL affiche l’avertissement `Storage policies were not changed`, Supabase
    n’autorise pas le rôle SQL à modifier sa table gérée `storage.objects`. Le reste du script
    est quand même appliqué. Dans ce cas, ouvrez **Storage → Policies** et créez sur
@@ -40,19 +44,17 @@ de passe ou une clé Supabase privée dans le code, le navigateur ou Git.
    - Mot de passe : une clé API Resend (à saisir dans Supabase, jamais dans le dépôt)
    - Expéditeur : une adresse appartenant au domaine vérifié dans Resend
 
-   Configurez ensuite les modèles de confirmation et de réinitialisation sous
-   **Authentication → Email Templates** et vérifiez que l’URL de redirection autorisée du site
-   est configurée sous **Authentication → URL Configuration**.
-3. Créez votre propre utilisateur avec une adresse e-mail que vous contrôlez, via l’inscription
-   du site ou Supabase **Authentication → Users**. Confirmez l’adresse e-mail.
+   Le SMTP reste utile pour les e-mails de récupération de mot de passe. Comme **Confirm email**
+   est désactivé, l’inscription ne dépend plus de l’envoi d’un e-mail de confirmation.
+3. Créez votre compte avec une adresse e-mail que vous contrôlez et connectez-vous. Il n’est
+   plus nécessaire de confirmer l’adresse par e-mail.
 4. Dans Supabase **SQL Editor**, vérifiez que le compte possède bien un profil client :
 
    ```sql
    SELECT profiles.id, profiles.email, profiles.role
    FROM public.profiles AS profiles
    JOIN auth.users AS users ON users.id = profiles.id
-   WHERE lower(users.email) = lower('votre-adresse@exemple.fr')
-     AND users.email_confirmed_at IS NOT NULL;
+   WHERE lower(users.email) = lower('votre-adresse@exemple.fr');
    ```
 
 5. Après avoir vérifié qu’une seule ligne correspond à votre propre compte, attribuez-lui le
@@ -64,13 +66,11 @@ de passe ou une clé Supabase privée dans le code, le navigateur ou Git.
    FROM auth.users AS users
    WHERE profiles.id = users.id
      AND lower(users.email) = lower('votre-adresse@exemple.fr')
-     AND users.email_confirmed_at IS NOT NULL
    RETURNING profiles.id, profiles.email, profiles.role;
    ```
 
-   N’exécutez cette requête que depuis le SQL Editor du projet Supabase après avoir confirmé
-   l’adresse et vérifié le compte retourné. Elle ne retourne aucune ligne si le compte n’existe
-   pas ou si son adresse n’est pas confirmée.
+   N’exécutez cette requête que depuis le SQL Editor du projet Supabase après vous être connecté
+   au site avec ce compte et avoir vérifié qu’une seule ligne correspond à votre propre adresse.
 
 6. Connectez-vous sur `/login?redirect=%2Fadmin` avec l’adresse et le mot de passe que vous
    avez choisis dans Supabase. Activez l’authentification multifacteur dans Supabase pour ce
@@ -81,6 +81,6 @@ administrateur partagé n’est intégré au dépôt. Le rôle `super_admin` peu
 SQL Editor en replaçant `super_admin` par `customer` pour le profil concerné.
 
 La migration de sécurité préserve les rôles administrateur déjà attribués afin d’éviter de
-verrouiller le propriétaire actuel. Après avoir confirmé l’accès du compte personnel que vous
+verrouiller le propriétaire actuel. Après avoir vérifié l’accès du compte personnel que vous
 contrôlez, vérifiez les anciens profils `super_admin` et rétrogradez uniquement ceux qui ne
 doivent plus administrer le site.

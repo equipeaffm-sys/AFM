@@ -65,7 +65,9 @@ function LoginForm() {
           router.push(redirectPath)
           router.refresh()
         } else {
-          setMessage('Inscription réussie ! Vérifiez votre email pour confirmer votre compte.')
+          setMessage(
+            'Le compte a été créé, mais Supabase demande encore une confirmation par e-mail. Désactivez « Confirm email » dans Authentication → Providers → Email pour permettre la connexion immédiate.'
+          )
         }
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -84,9 +86,11 @@ function LoginForm() {
       if (err instanceof Error) {
         const message = err.message.toLowerCase()
         setError(
-          message.includes('failed to fetch') || message.includes('networkerror')
-            ? 'Connexion à Supabase impossible. Vérifiez sur Vercel NEXT_PUBLIC_SUPABASE_URL et NEXT_PUBLIC_SUPABASE_ANON_KEY, puis redéployez. En local, vérifiez .env.local et redémarrez le serveur.'
-            : err.message
+          message.includes('error sending confirmation email')
+            ? 'Supabase tente encore d’envoyer un e-mail de confirmation. Dans le tableau de bord Supabase, désactivez Authentication → Providers → Email → Confirm email, puis réessayez.'
+            : message.includes('failed to fetch') || message.includes('networkerror')
+              ? 'Connexion à Supabase impossible. Vérifiez sur Vercel NEXT_PUBLIC_SUPABASE_URL et NEXT_PUBLIC_SUPABASE_ANON_KEY, puis redéployez. En local, vérifiez .env.local et redémarrez le serveur.'
+              : err.message
         )
       } else {
         setError('Une erreur est survenue lors de l\'authentification.')
@@ -184,10 +188,11 @@ function LoginForm() {
                 type="password"
                 autoComplete={isSignUp || isRecovery ? 'new-password' : 'current-password'}
                 required
+                minLength={isSignUp || isRecovery ? 8 : undefined}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-amber-500 text-sm transition-colors"
-                placeholder="••••••••"
+                placeholder={isSignUp || isRecovery ? '8 caractères minimum' : '••••••••'}
               />
             </div>
           )}

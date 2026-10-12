@@ -551,15 +551,14 @@ $storage_policies$;
 
 COMMIT;
 
--- After signing up and confirming your own account, grant yourself admin access
+-- After signing up and signing in to your own account, grant yourself admin access
 -- separately in the SQL Editor. Replace the email and verify the returned row:
 --
 -- UPDATE public.profiles AS profiles
 -- SET role = 'super_admin'
 -- FROM auth.users AS users
 -- WHERE profiles.id = users.id
---   AND lower(users.email) = lower('YOUR_CONFIRMED_EMAIL')
---   AND users.email_confirmed_at IS NOT NULL
+--   AND lower(users.email) = lower('YOUR_OWN_EMAIL')
 -- RETURNING profiles.id, profiles.email, profiles.role;
 --
 -- No customer order INSERT policy is enabled. The checkout endpoint is disabled;

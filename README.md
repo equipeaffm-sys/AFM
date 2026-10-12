@@ -34,12 +34,15 @@ schéma de la boutique, les rôles/RLS et le bucket public `product-images` (lec
 écriture réservée au personnel). Il peut être rejoué sur une nouvelle base ou une base déjà au
 schéma L&M actuel et ne crée aucun faux produit. Il s’arrête sans changement si les anciens types
 SQL incompatibles sont détectés. Sauvegardez une base existante avant la migration. Pour attribuer
-le rôle administrateur à votre propre compte après inscription et confirmation de l’adresse,
+le rôle administrateur à votre propre compte après inscription,
 suivez [`supabase/ADMIN_SETUP.md`](./supabase/ADMIN_SETUP.md). N’ajoutez jamais de mot de passe,
 de clé S3 ou de clé Supabase privée au code ou au dépôt.
 Si le SQL Editor ne permet pas de modifier `storage.objects`, le script affiche un avertissement
 et applique le reste de la configuration. Terminez alors les politiques Storage depuis le
 tableau de bord en suivant le guide d’administration.
+Pour que l’inscription ne requière pas de vérification par e-mail, désactivez **Confirm email**
+dans **Supabase → Authentication → Providers → Email**. Cette option autorise les comptes
+utilisant des adresses non vérifiées; elle ne peut pas être modifiée depuis le code du site.
 
 ## Conseiller de la boutique
 
