@@ -22,10 +22,15 @@ export default function ReservationForm({ dogId, dogName }: { dogId: string; dog
   const [otherPets, setOtherPets] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  const [consent, setConsent] = useState(false)
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (submitting) return
+    if (!consent) {
+      toast.error('Vous devez accepter le Certificat d\'engagement avant de soumettre la demande.')
+      return
+    }
     setSubmitting(true)
     try {
       const response = await fetch('/api/reservations', {
@@ -42,6 +47,7 @@ export default function ReservationForm({ dogId, dogName }: { dogId: string; dog
           has_garden: hasGarden,
           has_children: hasChildren,
           other_pets: otherPets || null,
+          consent: true,
         }),
       })
       const result: unknown = await response.json().catch(() => null)
@@ -149,10 +155,15 @@ export default function ReservationForm({ dogId, dogName }: { dogId: string; dog
         />
       </Field>
 
+      <div className="flex items-start gap-3">
+        <input id="consent" type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1" />
+        <label htmlFor="consent" className="text-sm text-zinc-300">J'ai lu et j'accepte le <a href="/certificat-engagement" target="_blank" rel="noopener noreferrer" className="underline">Certificat d'engagement</a> et les <a href="/conditions-de-reservation" className="underline">Conditions de Réservation</a>.</label>
+      </div>
+
       <button
         type="submit"
         disabled={submitting}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#665d4d] px-6 py-3.5 text-xs font-bold uppercase tracking-widest text-[#eeeae2] transition-colors hover:bg-[#77705f] disabled:opacity-50"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#665d4d] px-6 py-3.5 text-xs font-bold uppercase tracking-widest text-[#eeeae2] transition-colors hover:bg-[#77705f] disabled:opacity-60"
       >
         <PawPrint className="h-4 w-4" />
         {submitting ? 'Envoi en cours…' : 'Envoyer ma demande'}

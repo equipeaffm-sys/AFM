@@ -1,22 +1,65 @@
-import Link from 'next/link';
+'use client'
 
-const Footer = () => {
-  const SIRET = process.env.NEXT_PUBLIC_SIRET || 'En cours d\'immatriculation';
-  const RNA = process.env.NEXT_PUBLIC_RNA || 'En cours d\'obtention';
-  const ACACED = process.env.NEXT_PUBLIC_ACACED || 'En cours d\'obtention';
-  const ICAD = process.env.NEXT_PUBLIC_ICAD_HABILITATION || 'En cours d\'habilitation';
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://afm-affm.vercel.app';
+import React, { useEffect, useState } from 'react'
+import Link from 'next/link'
+
+type LegalInfo = {
+  siret?: string
+  rna?: string
+  acaced?: string
+  icad?: string
+  certificate_url?: string
+  acaced_url?: string
+}
+
+export default function Footer() {
+  const [remote, setRemote] = useState<LegalInfo | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const res = await fetch('/api/admin/legal')
+        if (!res.ok) return
+        const json = await res.json()
+        if (!mounted) return
+        const value = json?.value
+        if (!value) {
+          setRemote(null)
+        } else if (typeof value === 'string') {
+          try {
+            setRemote(JSON.parse(value))
+          } catch {
+            setRemote(null)
+          }
+        } else {
+          setRemote(value)
+        }
+      } catch (e) {
+        // ignore
+      }
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const SIRET = remote?.siret || process.env.NEXT_PUBLIC_SIRET || "En cours d'immatriculation"
+  const RNA = remote?.rna || process.env.NEXT_PUBLIC_RNA || "En cours d'obtention"
+  const ACACED = remote?.acaced || process.env.NEXT_PUBLIC_ACACED || "En cours d'obtention"
+  const ICAD = remote?.icad || process.env.NEXT_PUBLIC_ICAD_HABILITATION || "En cours d'habilitation"
+  const certUrl = remote?.certificate_url || null
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://afm-affm.vercel.app'
 
   return (
     <footer className="bg-gray-900 text-gray-100 py-12">
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
 
-          {/* Présentation */}
           <div>
             <h3 className="text-xl font-semibold mb-3">Elevage & engagement</h3>
             <p className="text-sm text-gray-300 mb-4">Nous sommes un élevage familial dédié au bien‑être des chiens de race. Notre approche repose
-              sur la socialisation précoce, l\'éducation respectueuse et des pratiques d\'élevage éthiques.
+              sur la socialisation précoce, l'éducation respectueuse et des pratiques d'élevage éthiques.
             </p>
             <p className="text-sm text-gray-400">Nos engagements :</p>
             <ul className="mt-2 text-sm text-gray-300 space-y-1">
@@ -27,7 +70,6 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* Liens rapides */}
           <div>
             <h3 className="text-xl font-semibold mb-3">Liens rapides</h3>
             <ul className="space-y-2 text-sm">
@@ -38,7 +80,6 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* Conformité & Réglementation */}
           <div>
             <h3 className="text-xl font-semibold mb-3">Conformité & Réglementation</h3>
             <p className="text-sm text-gray-300 mb-2">Informations administratives (remplir lorsque disponible) :</p>
@@ -59,10 +100,14 @@ const Footer = () => {
                 <dt className="font-medium">Habilitation ICAD</dt>
                 <dd>{ICAD}</dd>
               </div>
+              {certUrl && (
+                <div className="mt-3">
+                  <a href={certUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-gray-300 underline">Télécharger le certificat d'engagement</a>
+                </div>
+              )}
             </dl>
           </div>
 
-          {/* Mentions légales */}
           <div>
             <h3 className="text-xl font-semibold mb-3">Mentions légales & engagement</h3>
             <p className="text-sm text-gray-300 mb-3">Conformément à la loi n° 2021‑1539, nous fournissons à l'acquéreur un certificat d'engagement et
@@ -85,7 +130,5 @@ const Footer = () => {
         </div>
       </div>
     </footer>
-  );
-};
-
-export default Footer;
+  )
+}
