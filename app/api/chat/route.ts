@@ -1,167 +1,52 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'nodejs'
+const systemPrompt = `
+Vous êtes un conseiller chaleureux et expert pour un élevage canin de race. Répondez en français de manière claire, bienveillante et professionnelle.
+Donnez des conseils personnalisés sur le choix de la race en fonction de l'espace de vie (appartement, maison avec jardin), du niveau d'activité du foyer, du temps disponible pour l'éducation et la socialisation.
 
-type ChatMessage = {
-  role: 'user' | 'assistant'
-  content: string
-}
+Incluez toujours :
+- Un bref rappel des besoins d'exercice quotidiens et des stimulations mentales pour la race proposée.
+- Des recommandations d'éducation positive (renforcement positif, routines, socialisation précoce).
+- Les obligations légales importantes pour l'acquéreur (identification par puce, vaccination, responsabilité civile, déclaration si applicable).
+- Des conseils pratiques pour l'arrivée à la maison (aménagement, premiers jours, visite vétérinaire dans les 48–72h, carnet de santé).
 
-const jsonHeaders = { 'Cache-Control': 'no-store' }
+Respectez un ton empathique, évitez le sensationnalisme et ne fournissez pas de diagnostics médicaux — orientez toujours vers un vétérinaire pour les questions sanitaires précises.`;
 
-export async function GET() {
-  return NextResponse.json(
-    { configured: Boolean(process.env.XAI_API_KEY || process.env.CHAT_API_KEY) },
-    { headers: jsonHeaders }
-  )
-}
-
-export async function POST(request: NextRequest) {
-  const contentLength = Number(request.headers.get('content-length') || 0)
-  if (contentLength > 20_000) {
-    return NextResponse.json(
-      { error: 'Le message envoyé est trop volumineux.' },
-      { status: 413, headers: jsonHeaders }
-    )
-  }
-
-  const apiKey = process.env.XAI_API_KEY || process.env.CHAT_API_KEY
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: 'Le conseiller n’est pas configuré pour le moment.' },
-      { status: 503, headers: jsonHeaders }
-    )
-  }
-
-  let payload: unknown
+export async function POST(req: NextRequest) {
   try {
-    payload = await request.json()
-  } catch {
-    return NextResponse.json(
-      { error: 'La requête doit contenir un JSON valide.' },
-      { status: 400, headers: jsonHeaders }
-    )
-  }
+    const body = await req.json();
+    const messages = body.messages || [];
 
-  const rawMessages = (payload as { messages?: unknown } | null)?.messages
-  if (!Array.isArray(rawMessages) || rawMessages.length === 0 || rawMessages.length > 10) {
-    return NextResponse.json(
-      { error: 'La conversation contient un nombre de messages invalide.' },
-      { status: 400, headers: jsonHeaders }
-    )
-  }
+    const apiUrl = process.env.CHAT_API_URL || 'https://api.x.ai/v1/chat/completions';
+    const apiKey = process.env.XAI_API_KEY || process.env.CHAT_API_KEY;
+    const model = process.env.CHAT_MODEL || 'grok-4.7';
 
-  const messages: ChatMessage[] = []
-  for (const item of rawMessages) {
-    if (
-      !item ||
-      typeof item !== 'object' ||
-      !('role' in item) ||
-      !('content' in item) ||
-      !['user', 'assistant'].includes(String(item.role)) ||
-      typeof item.content !== 'string' ||
-      item.content.trim().length === 0 ||
-      item.content.length > 1000
-    ) {
-      return NextResponse.json(
-        { error: 'Un message est invalide ou dépasse la longueur autorisée.' },
-        { status: 400, headers: jsonHeaders }
-      )
+    if (!apiKey) {
+      return NextResponse.json({ error: 'Clé API pour le service de chat manquante côté serveur.' }, { status: 500 });
     }
-    if (item.role !== 'user' && item.role !== 'assistant') {
-      return NextResponse.json(
-        { error: 'Le rôle du message est invalide.' },
-        { status: 400, headers: jsonHeaders }
-      )
-    }
-    messages.push({ role: item.role, content: item.content.trim() })
-  }
 
-  if (messages[messages.length - 1].role !== 'user') {
-    return NextResponse.json(
-      { error: 'Le dernier message doit être une question du client.' },
-      { status: 400, headers: jsonHeaders }
-    )
-  }
+    const payload = {
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages,
+      ],
+      temperature: 0.3,
+    };
 
-  const endpoint =
-    process.env.CHAT_API_URL || 'https://api.x.ai/v1/chat/completions'
-  let endpointUrl: URL
-  try {
-    endpointUrl = new URL(endpoint)
-  } catch {
-    console.error('CHAT_API_URL must be a valid URL.')
-    return NextResponse.json(
-      { error: 'Le service de réponse est mal configuré.' },
-      { status: 500, headers: jsonHeaders }
-    )
-  }
-  if (endpointUrl.protocol !== 'https:' && endpointUrl.hostname !== 'localhost') {
-    console.error('CHAT_API_URL must use HTTPS outside localhost.')
-    return NextResponse.json(
-      { error: 'Le service de réponse est mal configuré.' },
-      { status: 500, headers: jsonHeaders }
-    )
-  }
-
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 20_000)
-  try {
-    const upstream = await fetch(endpointUrl, {
+    const apiRes = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: process.env.CHAT_MODEL || 'grok-4.7',
-        messages: [
-          {
-            role: 'system',
-            content:
-              'Tu es le conseiller de la boutique L&M. Réponds dans la langue du client, de façon chaleureuse, naturelle et concise. Va directement à la réponse, sans introduction répétitive ni justification inutile. N’affirme pas de prix, disponibilité, délai, caractéristique ou condition qui ne figure pas dans la conversation. Oriente vers le catalogue ou la fiche produit si nécessaire. Ne demande jamais de données personnelles ou de paiement.',
-          },
-          ...messages,
-        ],
-        temperature: 0.5,
-        max_tokens: 350,
-      }),
-      signal: controller.signal,
-      cache: 'no-store',
-    })
+      body: JSON.stringify(payload),
+    });
 
-    if (!upstream.ok) {
-      console.error(`Chat provider returned HTTP ${upstream.status}.`)
-      return NextResponse.json(
-        { error: 'Le conseiller ne peut pas répondre pour le moment. Réessayez plus tard.' },
-        { status: 502, headers: jsonHeaders }
-      )
-    }
-
-    const result: unknown = await upstream.json()
-    const message = (
-      result as { choices?: Array<{ message?: { content?: unknown } }> }
-    )?.choices?.[0]?.message?.content
-    if (typeof message !== 'string' || !message.trim()) {
-      console.error('Chat provider returned an empty or invalid response.')
-      return NextResponse.json(
-        { error: 'Le conseiller a retourné une réponse invalide.' },
-        { status: 502, headers: jsonHeaders }
-      )
-    }
-
-    return NextResponse.json({ message: message.trim() }, { headers: jsonHeaders })
-  } catch (error) {
-    console.error(
-      error instanceof Error && error.name === 'AbortError'
-        ? 'Chat provider request timed out.'
-        : 'Unable to reach chat provider.'
-    )
-    return NextResponse.json(
-      { error: 'Le conseiller ne peut pas répondre pour le moment. Réessayez plus tard.' },
-      { status: 502, headers: jsonHeaders }
-    )
-  } finally {
-    clearTimeout(timeout)
+    const json = await apiRes.json();
+    return NextResponse.json(json, { status: apiRes.status });
+  } catch (err: any) {
+    console.error('Chat proxy error', err);
+    return NextResponse.json({ error: err?.message || 'Erreur serveur' }, { status: 500 });
   }
 }
