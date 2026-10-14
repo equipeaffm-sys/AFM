@@ -3,49 +3,57 @@ import Stripe from 'stripe';
 import { createClient } from '@/lib/supabase/server';
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
-const stripe = new Stripe(stripeSecret || '', { apiVersion: '2022-11-15' });
+const stripe = stripeSecret ? new Stripe(stripeSecret, { apiVersion: '2022-11-15' }) : null;
 
-// Helper to compute total from product rows
 async function computeLineItemsFromDb(items: { id: string; quantity: number }[]) {
   const supabase = createClient();
   const ids = items.map((i) => i.id);
   const { data, error } = await supabase.from('products').select('id, name, price_cents').in('id', ids);
-  if (error) throw new Error('Impossible de récupérer les produits côté serveur: ' + error.message);
-  if (!data || data.length === 0) throw new Error('Aucun produit trouvé pour les identifiants fournis.');
 
-  const priceMap = new Map<string, { name: string; price_cents: number }>();
-  for (const p of data) {
-    // @ts-ignore
-    priceMap.set(String(p.id), { name: p.name, price_cents: Number(p.price_cents) });
+  if (error) {
+    throw new Error('Impossible de récupérer les produits côté serveur: ' + error.message);
   }
 
-  const line_items = items.map((it) => {
-    const found = priceMap.get(String(it.id));
-    if (!found) throw new Error(`Produit introuvable ou prix manquant pour l'id ${it.id}`);
+  if (!data || data.length === 0) {
+    throw new Error('Aucun produit trouvé pour les identifiants fournis.');
+  }
+
+  const priceMap = new Map<string, { name: string; price_cents: number }>();
+  for (const product of data) {
+    const productId = String(product.id);
+    // @ts-ignore
+    priceMap.set(productId, {
+      name: product.name,
+      // @ts-ignore
+      price_cents: Number(product.price_cents),
+    });
+  }
+
+  return items.map((entry) => {
+    const product = priceMap.get(String(entry.id));
+    if (!product) {
+      throw new Error(`Produit introuvable ou prix manquant pour l'id ${entry.id}`);
+    }
+
     return {
       price_data: {
         currency: 'eur',
-        product_data: { name: found.name },
-        unit_amount: Number(found.price_cents),
+        product_data: { name: product.name },
+        unit_amount: Number(product.price_cents),
       },
-      quantity: it.quantity,
+      quantity: entry.quantity,
     };
   });
-
-  return line_items;
 }
 
 export async function GET() {
-  // Return whether checkout is available (used by CartDrawer)
-  const enabled = (process.env.PAYMENTS_ENABLED === 'true' || !!process.env.STRIPE_SECRET_KEY) && !!stripeSecret;
+  const enabled = (process.env.PAYMENTS_ENABLED === 'true' || Boolean(process.env.STRIPE_SECRET_KEY)) && Boolean(stripeSecret);
   return NextResponse.json({ enabled });
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-
-    // Reservation flow (single fixed deposit)
     const isReservation = Boolean(body.purpose === 'reservation_de_chiot' || body.reservation === true || body.metadata?.purpose === 'reservation_de_chiot');
 
     if (isReservation) {
@@ -54,7 +62,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Consentement au certificat d'engagement requis pour procéder." }, { status: 400 });
       }
 
-      if (!stripeSecret) {
+      if (!stripeSecret || !stripe) {
         return NextResponse.json({ error: 'Configuration Stripe manquante côté serveur.' }, { status: 500 });
       }
 
@@ -81,25 +89,24 @@ export async function POST(req: NextRequest) {
           ...(body.metadata || {}),
           purpose: 'reservation_de_chiot',
         },
-        success_url: body.successUrl || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://afm-affm.vercel.app'}/merci?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: body.cancelUrl || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://afm-affm.vercel.app'}/panier`,
+        success_url: body.successUrl || `${siteUrl}/merci?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: body.cancelUrl || `${siteUrl}/panier`,
       });
 
       return NextResponse.json({ url: session.url });
     }
 
-    // Standard cart checkout flow: expects items: [{id, quantity}]
     const items: { id: string; quantity: number }[] = Array.isArray(body.items) ? body.items : [];
     if (items.length === 0) {
       return NextResponse.json({ error: 'Aucun article fourni pour le paiement.' }, { status: 400 });
     }
 
-    if (!stripeSecret) {
+    if (!stripeSecret || !stripe) {
       return NextResponse.json({ error: 'Configuration Stripe manquante côté serveur.' }, { status: 500 });
     }
 
-    // Compute line items from DB to avoid trusting client prices
     const line_items = await computeLineItemsFromDb(items);
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://afm-affm.vercel.app';
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -108,8 +115,8 @@ export async function POST(req: NextRequest) {
       metadata: {
         ...(body.metadata || {}),
       },
-      success_url: body.successUrl || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://afm-affm.vercel.app'}/merci?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: body.cancelUrl || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://afm-affm.vercel.app'}/panier`,
+      success_url: body.successUrl || `${siteUrl}/merci?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: body.cancelUrl || `${siteUrl}/panier`,
     });
 
     return NextResponse.json({ url: session.url });
