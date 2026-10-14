@@ -23,7 +23,18 @@ export default function Footer() {
         if (!res.ok) return
         const json = await res.json()
         if (!mounted) return
-        setRemote(json?.value ? JSON.parse(json.value) : null)
+        const value = json?.value
+        if (!value) {
+          setRemote(null)
+        } else if (typeof value === 'string') {
+          try {
+            setRemote(JSON.parse(value))
+          } catch {
+            setRemote(null)
+          }
+        } else {
+          setRemote(value)
+        }
       } catch (e) {
         // ignore
       }
@@ -33,10 +44,10 @@ export default function Footer() {
     }
   }, [])
 
-  const SIRET = remote?.siret || process.env.NEXT_PUBLIC_SIRET || 'En cours d\'immatriculation'
-  const RNA = remote?.rna || process.env.NEXT_PUBLIC_RNA || 'En cours d\'obtention'
-  const ACACED = remote?.acaced || process.env.NEXT_PUBLIC_ACACED || 'En cours d\'obtention'
-  const ICAD = remote?.icad || process.env.NEXT_PUBLIC_ICAD_HABILITATION || 'En cours d\'habilitation'
+  const SIRET = remote?.siret || process.env.NEXT_PUBLIC_SIRET || "En cours d'immatriculation"
+  const RNA = remote?.rna || process.env.NEXT_PUBLIC_RNA || "En cours d'obtention"
+  const ACACED = remote?.acaced || process.env.NEXT_PUBLIC_ACACED || "En cours d'obtention"
+  const ICAD = remote?.icad || process.env.NEXT_PUBLIC_ICAD_HABILITATION || "En cours d'habilitation"
   const certUrl = remote?.certificate_url || null
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://afm-affm.vercel.app'
 
