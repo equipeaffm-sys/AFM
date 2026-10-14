@@ -12,6 +12,13 @@ Incluez toujours :
 
 Respectez un ton empathique, évitez le sensationnalisme et ne fournissez pas de diagnostics médicaux — orientez toujours vers un vétérinaire pour les questions sanitaires précises.`;
 
+export async function GET() {
+  // Simple health/config check for admin UI
+  const apiKey = process.env.XAI_API_KEY || process.env.CHAT_API_KEY;
+  const configured = Boolean(apiKey && apiKey.length > 10);
+  return NextResponse.json({ configured });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
